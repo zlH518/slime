@@ -48,7 +48,8 @@ def train(args):
         actor_model.get_rollout_data(rollout_id)
 
         # Start the next rollout early.
-        generation_handles = rollout_generator.async_generate(rollout_id + 1)
+        if rollout_id + 1 < args.num_rollout:
+            generation_handles = rollout_generator.async_generate(rollout_id + 1)
 
         ray.get(actor_model.async_train(rollout_id, with_data_fetching=False))
 

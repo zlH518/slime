@@ -185,7 +185,7 @@ class Buffer:
             data = pickle.load(
                 open(self.args.load_debug_rollout_data.format(rollout_id=rollout_id), "rb"),
             )
-            data = [Sample(**sample) for sample in data]
+            data = [Sample.from_dict(sample) for sample in data]
         else:
             generate_rollout = self.eval_generate_rollout if evaluation else self.generate_rollout
             data = generate_rollout(self.args, rollout_id, self, evaluation=evaluation)
@@ -245,7 +245,7 @@ class Buffer:
         if not evaluation:
             if self.args.save_debug_rollout_data:
                 pickle.dump(
-                    [sample.__dict__ for sample in data],
+                    [sample.to_dict() for sample in data],
                     open(self.args.save_debug_rollout_data.format(rollout_id=self.rollout_id), "wb"),
                 )
             data = self._convert_samples_to_train_data(data)

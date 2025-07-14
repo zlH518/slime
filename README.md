@@ -16,6 +16,7 @@
         - [Dense Model Examples: GLM-4-9B and Qwen3-4B](#Dense-Model-Examples-GLM-4-9B-and-Qwen3-4B)
         - [MoE Model Example: Qwen3-30B-A3B](#MoE-Model-Example-Qwen3-30B-A3B)
         - [Multi-Turn + Tool Calling Example: Search-R1 lite](#Multi-Turn--Tool-Calling-Example-Search-R1-lite)
+        - [SFT Example: Qwen3-4B-Base with OpenHermes-2.5](#SFT-Example-Qwen3-4B-Base-with-OpenHermes-25)
   - [Checkpoint Format Conversion](#checkpoint-format-conversion)
   - [Starting the Training Process](#starting-the-training-process)
   - [Argument Descriptions](#argument-descriptions)
@@ -70,7 +71,13 @@ For MoE example, please refer to:
 
 For multi-turn and tool calling, we also provides an minimal reimplenmentation of Search-R1, please refer to:
 
-- [Example: Search-R1 lite](examples/search-r1/README.md)
+- [Example: Search-R1 lite](examples/search-r1/README.md).
+
+#### SFT Example: Qwen3-4B-Base with OpenHermes-2.5
+
+slime is not just a RL framework, we support a diverse set of post-training setups. For an SFT example, please refer to:
+
+- [Example: Qwen3-4B-Base with OpenHermes-2.5](docs/en/sft.md).
 
 ### Checkpoint Format Conversion
 
