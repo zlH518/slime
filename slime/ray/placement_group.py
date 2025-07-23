@@ -98,7 +98,7 @@ def create_placement_groups(args):
     }
 
 
-def allocate_train_group(num_nodes, num_gpus_per_node, pg):
+def allocate_train_group(num_nodes, num_gpus_per_node, pg, task_id):
     # TODO: need to cacluate
     num_gpus_per_actor = 0.8
 

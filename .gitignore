@@ -180,3 +180,5 @@ local/
 **/buffer_stats/
 *.out
 *.pkl
+
+tools/torch_memory_saver

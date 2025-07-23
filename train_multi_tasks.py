@@ -5,7 +5,7 @@ import ray
 import asyncio
 
 
-from slime.scheduler import Scheduler
+from slime.scheduler import Scheduler, SchedulerParams
 from slime.utils.arguments import parse_args
 
 

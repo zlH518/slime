@@ -30,7 +30,7 @@ from .update_weight_utils import (
 
 
 class MegatronTrainRayActor(TrainRayActor):
-    def init(self, args, role, with_ref=False):
+    async def init(self, args, role, with_ref=False):
         super().init(args, role, with_ref)
 
         wandb_run_id = init(args)
@@ -52,17 +52,17 @@ class MegatronTrainRayActor(TrainRayActor):
         )
         start_rollout_id = loaded_rollout_id + 1
         self.weights = {"actor": {}}
-        self.update_cpu_params_dict(self.weights["actor"])
+        await self.update_cpu_params_dict(self.weights["actor"])
 
         if with_ref:
-            self.load_other_checkpoint("ref", args.ref_load)
+            await self.load_other_checkpoint("ref", args.ref_load)
 
         if self.args.keep_old_actor:
-            self.load_other_checkpoint("old_actor", args.load)
+            await self.load_other_checkpoint("old_actor", args.load)
 
         if self.args.offload:
             # recover to actor in the end.
-            self.update_gpu_params_dict(self.weights["actor"])
+            await self.update_gpu_params_dict(self.weights["actor"])
             self.sleep(("model"))
 
         update_weight_cls = UpdateWeightFromTensor if self.args.colocate else UpdateWeightFromDistributed
@@ -90,20 +90,20 @@ class MegatronTrainRayActor(TrainRayActor):
         Timer().start("train_wait")
         return start_rollout_id
 
-    @torch.no_grad()
-    def update_cpu_params_dict(self, params_dict):
-        for name, param in named_parameters(self.args, self.model):
-            if name not in params_dict:
-                params_dict[name] = torch.empty_like(param, device=torch.device("cpu"), pin_memory=True)
-            params_dict[name].copy_(param.detach(), non_blocking=True)
-        torch.cuda.synchronize()
+    async def update_cpu_params_dict(self, params_dict):
+        with torch.no_grad():
+            for name, param in named_parameters(self.args, self.model):
+                if name not in params_dict:
+                    params_dict[name] = torch.empty_like(param, device=torch.device("cpu"), pin_memory=True)
+                params_dict[name].copy_(param.detach(), non_blocking=True)
+            torch.cuda.synchronize()
 
-    @torch.no_grad()
-    def update_gpu_params_dict(self, params_dict):
-        for name, param in named_parameters(self.args, self.model):
-            assert name in params_dict
-            param.copy_(params_dict[name], non_blocking=True)
-        torch.cuda.synchronize()
+    async def update_gpu_params_dict(self, params_dict):
+        with torch.no_grad():
+            for name, param in named_parameters(self.args, self.model):
+                assert name in params_dict
+                param.copy_(params_dict[name], non_blocking=True)
+            torch.cuda.synchronize()
 
     @timer
     async def sleep(self, tags):
@@ -114,7 +114,7 @@ class MegatronTrainRayActor(TrainRayActor):
 
         clear_memory()
         print_memory(f"before offload model")
-        self.update_cpu_params_dict(self.weights["actor"])
+        await self.update_cpu_params_dict(self.weights["actor"])
 
         allocator = CuMemAllocator.get_instance()
         allocator.sleep(offload_tags=tags)
@@ -143,7 +143,7 @@ class MegatronTrainRayActor(TrainRayActor):
             print(f"Updating buffer's wandb run_id to: {self.args.wandb_run_id}")
             await self.data_buffer.update_wandb_run_id.remote(self.args.wandb_run_id)
 
-    def get_rollout_data(self, rollout_id, rollout_data):
+    async def get_rollout_data(self, rollout_id, rollout_data):
         # Fetch data through ray on CPU, not sure if this will be performance bottleneck.
         # Both first pp stage and the last pp stage will recieve the data.
         process_rollout_data(
@@ -155,7 +155,7 @@ class MegatronTrainRayActor(TrainRayActor):
             rollout_data=rollout_data,
         )
 
-    def compute_log_prob(
+    async def compute_log_prob(
         self,
         model_tag,
         log_probs_data_iterator,
@@ -167,7 +167,7 @@ class MegatronTrainRayActor(TrainRayActor):
         for data_iterator in log_probs_data_iterator:
             data_iterator.reset()
 
-        self.update_gpu_params_dict(self.weights[model_tag])
+        await self.update_gpu_params_dict(self.weights[model_tag])
 
         with timer(f"{store_prefix}log_probs"):
             forward_only(
@@ -187,7 +187,7 @@ class MegatronTrainRayActor(TrainRayActor):
         if self.args.debug_rollout_only:
             # For debug rollout, we just log the data and return.
             if with_data_fetching:
-                self.get_rollout_data(rollout_id, rollout_data)
+                await self.get_rollout_data(rollout_id, rollout_data)
             log_rollout_data(rollout_id, self.args, rollout_data)
             log_perf_data(rollout_id, self.args)
             Timer().start("train_wait")
@@ -200,7 +200,7 @@ class MegatronTrainRayActor(TrainRayActor):
             with timer("data_preprocess"):
                 # For async train, we need to separate the data fetching and training.
                 if with_data_fetching:
-                    self.get_rollout_data(rollout_id, rollout_data)
+                    await self.get_rollout_data(rollout_id, rollout_data)
 
                 # Create data iterator for log_probs and train.
                 (
@@ -212,8 +212,8 @@ class MegatronTrainRayActor(TrainRayActor):
 
             if self.args.compute_advantages_and_returns:
                 if "ref" in self.weights:
-                    self.update_gpu_params_dict(self.weights["ref"])
-                    self.compute_log_prob(
+                    await self.update_gpu_params_dict(self.weights["ref"])
+                    await self.compute_log_prob(
                         "ref",
                         log_probs_data_iterator,
                         log_probs_num_microbatches,
@@ -221,7 +221,7 @@ class MegatronTrainRayActor(TrainRayActor):
                         rollout_data=rollout_data,
                     )
 
-                self.compute_log_prob(
+                await self.compute_log_prob(
                     "old_actor" if self.args.keep_old_actor else "actor",
                     log_probs_data_iterator,
                     log_probs_num_microbatches,
@@ -230,7 +230,7 @@ class MegatronTrainRayActor(TrainRayActor):
                 )
                 # when there is old actor, we need to update the model params to actor manually
                 if "old_actor" in self.weights:
-                    self.update_gpu_params_dict(self.weights["actor"])
+                    await self.update_gpu_params_dict(self.weights["actor"])
 
                 # Calculate adv and returns. Need to performed before training (instead of on the fly),
                 # because we may need normalize the whole rollout.
@@ -255,7 +255,7 @@ class MegatronTrainRayActor(TrainRayActor):
         log_perf_data(rollout_id, self.args)
         Timer().start("train_wait")
 
-    def eval(self, rollout_id):
+    async def eval(self, rollout_id):
         if self.args.debug_train_only:
             return
 
@@ -271,13 +271,13 @@ class MegatronTrainRayActor(TrainRayActor):
         else:
             save(iteration, self.model, None, None)
 
-    def connect_rollout_engines(self, rollout_engines, rollout_engine_lock):
+    async def connect_rollout_engines(self, rollout_engines, rollout_engine_lock):
         self.rollout_engines = rollout_engines
 
         if self.args.debug_train_only or self.args.debug_rollout_only:
             return
 
-        self.weight_updator.connect_rollout_engines(rollout_engines, rollout_engine_lock)
+        await self.weight_updator.connect_rollout_engines(rollout_engines, rollout_engine_lock)
         dist.barrier(group=get_gloo_group())
 
     @timer
@@ -286,16 +286,16 @@ class MegatronTrainRayActor(TrainRayActor):
             return
 
         torch.cuda.empty_cache()
-        self.weight_updator.update_weights()
+        await self.weight_updator.update_weights()
         dist.barrier(group=get_gloo_group())
         clear_memory()
         print_memory("after update_weights")
 
         if getattr(self.args, "keep_old_actor", False):
             print("update rollout model on cpu using actor model")
-            self.update_cpu_params_dict(self.weights["old_actor"])
+            await self.update_cpu_params_dict(self.weights["old_actor"])
 
-    def load_other_checkpoint(self, model_tag, path):
+    async def load_other_checkpoint(self, model_tag, path):
         old_args = self.args.load, self.args.no_load_optim, self.args.no_load_rng, self.args.finetune
         self.args.load = path
         self.args.no_load_optim = True
@@ -311,4 +311,4 @@ class MegatronTrainRayActor(TrainRayActor):
         self.args.load, self.args.no_load_optim, self.args.no_load_rng, self.args.finetune = old_args
 
         self.weights[model_tag] = {}
-        self.update_cpu_params_dict(self.weights[model_tag])
+        await self.update_cpu_params_dict(self.weights[model_tag])

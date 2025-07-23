@@ -12,12 +12,15 @@ def load_function(path):
     return getattr(module, attr)
 
 
-class Singleton(type):
+class SingletonMeta(type):
+    """
+    A metaclass for creating singleton classes.
+    """
 
-    _instance = None
-    
-    def __new__(cls,tasks_args):
-        """Singleton pattern to ensure only one instance of PipeEngine exists."""
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-        return cls._instance
+    _instances = {}
+
+    def __call__(cls, *args, **kwargs):
+        if cls not in cls._instances:
+            instance = super().__call__(*args, **kwargs)
+            cls._instances[cls] = instance
+        return cls._instances[cls]

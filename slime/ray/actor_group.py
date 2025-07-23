@@ -1,6 +1,7 @@
 from typing import Dict
 
 import ray
+import asyncio
 
 from ray.util.placement_group import PlacementGroup
 from ray.util.scheduling_strategies import PlacementGroupSchedulingStrategy
@@ -81,12 +82,14 @@ class RayTrainGroup:
                 master_addr, master_port = ray.get(actor.get_master_addr_and_port.remote())
             self._actor_handlers.append(actor)
 
-    def async_init(self, args, role, with_ref=False):
+    async def async_init(self, args, role, with_ref=False):
         """
         Allocate GPU resourced and initialize model, optimzier, local ckpt, etc.
         """
         self.args = args
-        return [actor.init.remote(args, role, with_ref=with_ref) for actor in self._actor_handlers]
+        ref = [actor.init.remote(args, role, with_ref=with_ref) for actor in self._actor_handlers]
+        await asyncio.gather(*ref)
+        return ref
 
     async def async_init_weight_update_connections(self, rollout):
         """
@@ -96,34 +99,45 @@ class RayTrainGroup:
         self.rollout = rollout
         await asyncio.gather(*[actor.set_data_buffer.remote(rollout.data_buffer) for actor in self._actor_handlers])
 
-        return [
+        ref = [
             actor.connect_rollout_engines.remote(
                 rollout.rollout_engines,
                 rollout.rollout_engine_lock,
             )
             for actor in self._actor_handlers
         ]
+        await asyncio.gather(*ref)
+        return ref
 
-    def get_rollout_data(self, rollout_id):
-        ray.get([actor.get_rollout_data.remote(rollout_id) for actor in self._actor_handlers])
+    async def get_rollout_data(self, rollout_id):
+        await asyncio.gather(*[actor.get_rollout_data.remote(rollout_id) for actor in self._actor_handlers])
 
     async def async_train(self, rollout_id, with_data_fetching=True):
         """Do one rollout training"""
-        return [
+        ref = [
             actor.train.remote(rollout_id, with_data_fetching=with_data_fetching) for actor in self._actor_handlers
         ]
+        await asyncio.gather(*ref)
+        return ref
 
-    def async_eval(self, rollout_id):
+    async def async_eval(self, rollout_id):
         """Evaluate the model"""
-        return [actor.eval.remote(rollout_id) for actor in self._actor_handlers]
+        ref = [actor.eval.remote(rollout_id) for actor in self._actor_handlers]
+        await asyncio.gather(*ref)
 
     async def async_save_model(self, step_id):
         """Save actor model on rank 0."""
-        return [actor.save_model.remote(step_id) for actor in self._actor_handlers]
+        ref = [actor.save_model.remote(step_id) for actor in self._actor_handlers]
+        await asyncio.gather(*ref)
+        return ref
 
     async def async_update_weights(self):
         """Broadcast weights from rank 0 to all other ranks."""
-        return [actor.update_weights.remote() for actor in self._actor_handlers]
+        ref = [actor.update_weights.remote() for actor in self._actor_handlers]
+        await asyncio.gather(*ref)
+        return ref
 
     async def async_offload(self):
-        return [actor.sleep.remote(("model")) for actor in self._actor_handlers]
+        ref = [actor.sleep.remote(("model")) for actor in self._actor_handlers]
+        await asyncio.gather(*ref)
+        return ref

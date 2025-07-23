@@ -50,10 +50,10 @@ class RolloutRayActor(RayActor):
     def reset_prefix_cache(self):
         self.infer_engine.reset_prefix_cache()
 
-    def sleep(self, level=1):
+    async def sleep(self, level=1):
         self.infer_engine.sleep(level=level)
 
-    def wake_up(self):
+    async def wake_up(self):
         self.infer_engine.wake_up()
 
     def pause_generation(self):
@@ -205,11 +205,17 @@ class RolloutGroup:
     async def async_generate(self, rollout_id, evaluation=False):
         return self.data_buffer.generate.remote(rollout_id, evaluation=evaluation)
 
-    def async_reset_prefix_cache(self):
-        return [engine.reset_prefix_cache.remote() for engine in self.rollout_engines]
+    async def async_reset_prefix_cache(self):
+        ref = [engine.reset_prefix_cache.remote() for engine in self.rollout_engines]
+        await asyncio.gather(*ref)
+        return ref
 
     async def async_offload(self):
-        return [engine.sleep.remote() for engine in self.rollout_engines]
+        ref = [engine.sleep.remote() for engine in self.rollout_engines]
+        await asyncio.gather(*ref)
+        return ref
 
-    def async_onload(self):
-        return [engine.wake_up.remote() for engine in self.rollout_engines]
+    async def async_onload(self):
+        ref = [engine.wake_up.remote() for engine in self.rollout_engines]
+        await asyncio.gather(*ref)
+        return ref

@@ -1,6 +1,7 @@
 import re
 import socket
 import time
+import asyncio
 from tqdm import tqdm
 from sglang.srt.utils import MultiprocessingSerializer
 
@@ -329,7 +330,7 @@ class UpdateWeightFromDistributed:
         self.vocab_size = vocab_size
         self.quantization_config = quantization_config
 
-    def connect_rollout_engines(self, rollout_engines, rollout_engine_lock):
+    async def connect_rollout_engines(self, rollout_engines, rollout_engine_lock):
         self.rollout_engines = rollout_engines
         self.rollout_engine_lock = rollout_engine_lock
 
@@ -368,12 +369,12 @@ class UpdateWeightFromDistributed:
                 rank=0,
                 group_name=self._group_name,
             )
-            ray.get(refs)
+            await asyncio.gather(*refs)
 
-    def update_weights(self):
+    async def update_weights(self):
         if dist.get_rank() == 0:
-            ray.get([engine.pause_generation.remote() for engine in self.rollout_engines])
-            ray.get([engine.reset_prefix_cache.remote() for engine in self.rollout_engines])
+            await asyncio.gather(*[engine.pause_generation.remote() for engine in self.rollout_engines])
+            await asyncio.gather(*[engine.reset_prefix_cache.remote() for engine in self.rollout_engines])
         dist.barrier(group=get_gloo_group())
 
         buffer_size = 0
@@ -384,7 +385,7 @@ class UpdateWeightFromDistributed:
         for name, param in named_parameters(self.args, self.model):
             if ".experts." in name:
                 continue
-            buffer_size = self._update_weight_from_distributed(
+            buffer_size = await self._update_weight_from_distributed(
                 name, param, converted_named_tensors, buffer_size, pbar=pbar
             )
 
@@ -398,7 +399,7 @@ class UpdateWeightFromDistributed:
         for name, param in named_parameters(self.args, self.model):
             if ".experts." not in name:
                 continue
-            buffer_size = self._update_expert_weight_from_distributed(
+            buffer_size = await self._update_expert_weight_from_distributed(
                 name, param, named_tensors, buffer_size, pbar=pbar
             )
 
@@ -407,10 +408,10 @@ class UpdateWeightFromDistributed:
 
         dist.barrier(group=get_gloo_group())
         if dist.get_rank() == 0:
-            ray.get([engine.continue_generation.remote() for engine in self.rollout_engines])
+            await asyncio.gather(*[engine.continue_generation.remote() for engine in self.rollout_engines])
         dist.barrier(group=get_gloo_group())
 
-    def _update_weight_from_distributed(self, name, param, converted_named_tensors, buffer_size, pbar=None):
+    async def _update_weight_from_distributed(self, name, param, converted_named_tensors, buffer_size, pbar=None):
         param = all_gather_param(name, param)
         param = remove_padding(name, param, self.vocab_size)
         if not self._is_pp_src_rank:
@@ -418,13 +419,13 @@ class UpdateWeightFromDistributed:
 
         param_size = param.numel() * param.element_size()
         if buffer_size + param_size > self.args.update_weight_buffer_size:
-            self._update_bucket_weights_from_distributed(converted_named_tensors, pbar=pbar)
+            await self._update_bucket_weights_from_distributed(converted_named_tensors, pbar=pbar)
             buffer_size = 0
         converted_named_tensors += convert_to_hf(self.args, self.model_name, name, param, self.quantization_config)
         buffer_size += param_size
         return buffer_size
 
-    def _update_expert_weight_from_distributed(self, name, param, named_tensors, buffer_size, pbar=None):
+    async def _update_expert_weight_from_distributed(self, name, param, named_tensors, buffer_size, pbar=None):
         param = all_gather_param(name, param)
         param = remove_padding(name, param, self.vocab_size)
 
@@ -432,14 +433,14 @@ class UpdateWeightFromDistributed:
         if (
             buffer_size + param_size
         ) * mpu.get_expert_model_parallel_world_size() > self.args.update_weight_buffer_size:
-            self._update_expert_bucket_weights_from_distributed(named_tensors, pbar=pbar)
+            await self._update_expert_bucket_weights_from_distributed(named_tensors, pbar=pbar)
             buffer_size = 0
 
         named_tensors.append((name, param))
         buffer_size += param_size
         return buffer_size
 
-    def _update_expert_bucket_weights_from_distributed(self, named_tensors, pbar=None):
+    async def _update_expert_bucket_weights_from_distributed(self, named_tensors, pbar=None):
         names = [name for name, _ in named_tensors]
         all_names = [None] * mpu.get_expert_model_parallel_world_size()
         dist.all_gather_object(all_names, names, group=mpu.get_expert_model_parallel_group())
@@ -469,12 +470,12 @@ class UpdateWeightFromDistributed:
         converted_hf_tensors = []
         for name, param in all_gathered_params:
             converted_hf_tensors += convert_to_hf(self.args, self.model_name, name, param, self.quantization_config)
-        self._update_bucket_weights_from_distributed(converted_hf_tensors, pbar=pbar)
+        await self._update_bucket_weights_from_distributed(converted_hf_tensors, pbar=pbar)
 
-    def _update_bucket_weights_from_distributed(self, converted_named_tensors, pbar=None):
+    async def _update_bucket_weights_from_distributed(self, converted_named_tensors, pbar=None):
         # lock the rollout engines to prevent dead lock on broadcast.
-        while not ray.get(self.rollout_engine_lock.acquire.remote()):
-            time.sleep(0.1)
+        while not (await self.rollout_engine_lock.acquire.remote()):
+            await asyncio.sleep(0.1)
 
         refs = [
             engine.update_weights_from_distributed.remote(
@@ -492,7 +493,7 @@ class UpdateWeightFromDistributed:
         for handle in handles:
             handle.wait()
 
-        ray.get(refs)
+        await asyncio.gather(*refs)
         converted_named_tensors.clear()
-        ray.get(self.rollout_engine_lock.release.remote())
+        await self.rollout_engine_lock.release.remote()
         pbar.update(1)
