@@ -17,7 +17,7 @@ class TrainRayActor(RayActor):
         if master_addr:
             self.master_addr, self.master_port = master_addr, master_port
         else:
-            self.master_addr, self.master_port = self._get_current_node_ip_and_free_port(start_port=20000)
+            self.master_addr, self.master_port = self._get_current_node_ip_and_free_port(start_port=20000+self._task_id*100)
 
         os.environ["MASTER_ADDR"] = self.master_addr
         os.environ["MASTER_PORT"] = str(self.master_port)
