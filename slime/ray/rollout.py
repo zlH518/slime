@@ -105,9 +105,9 @@ def create_rollout_engines(args, pg):
 
         def get_addr_and_ports():
             # use small ports to prevent ephemeral port between 32768 and 65536.
-            start_port = 10000
+            start_port = 10000+args.task_id*100
 
-            def port(consecutive=1):
+            def port(consecutive=10):
                 nonlocal start_port
                 _, port = ray.get(
                     engine._get_current_node_ip_and_free_port.remote(
@@ -179,13 +179,22 @@ class RolloutGroup:
         from sglang_router.launch_router import RouterArgs
 
         self.args.sglang_router_ip = get_host_info()[1]
-        self.args.sglang_router_port = find_available_port(random.randint(3000, 6000))
+        self.args.sglang_router_port = find_available_port(random.randint(3000+1000*self.args.task_id, 4000+1000*self.args.task_id))
+
+        print("0"*100)
+        print(f"{self.args.task_id}: {self.args.sglang_router_ip}, {self.args.sglang_router_port}")
+        print("0"*100)
 
         router_args = RouterArgs(
             host=self.args.sglang_router_ip,
             port=self.args.sglang_router_port,
+            prometheus_port=29000+self.args.task_id,
             balance_abs_threshold=0,
         )
+    
+        print("*"*100)
+        print(f"promethus port: {router_args.prometheus_port}")
+        print("*"*100)
 
         if hasattr(router_args, "log_level"):
             router_args.log_level = "warn"

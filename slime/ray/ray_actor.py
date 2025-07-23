@@ -4,7 +4,7 @@ from slime.utils.http_utils import is_port_available
 
 class RayActor:
     @staticmethod
-    def _get_current_node_ip_and_free_port(start_port=10000, consecutive=1):
+    def _get_current_node_ip_and_free_port(start_port=10000, consecutive=10):
         address = ray._private.services.get_node_ip_address()
         # strip ipv6 address
         address = address.strip("[]")

@@ -9,11 +9,11 @@ class Task:
     def __init__(self, args):
         self.args = args
         self.pgs = args.pgs
-        self.task_id = None
         self.tasks_num = args.tasks_num
 
         self.args.task_id = Task._task_id
         self.task_id = Task._task_id
+        Task._task_id = Task._task_id + 1
         assert Task._task_id <= self.args.tasks_num
 
         self.actor_model = create_actor_group(
@@ -25,11 +25,6 @@ class Task:
                 args=self.args,
                 pg=self.pgs["rollout"],
             )
-    
-    def __post_init__(self):
-        # TODO: do something for specific task, such as pgs、offset
-        Task._task_id += 1
-        pass
 
     async def init(self):
         self.num_rollout_per_epoch = None

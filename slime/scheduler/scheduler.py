@@ -27,7 +27,8 @@ class Scheduler:
 
     async def init_task(self):
         print("Initializing tasks...")
-        await asyncio.gather(*[task.init() for task in self.tasks])
+        for task in self.tasks:
+            await task.init()
         print("All tasks initialized.")
 
 

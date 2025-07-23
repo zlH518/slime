@@ -46,9 +46,15 @@ def run_router(args):
         router = launch_router(args)
         if router is None:
             return 1
-        return 0
+        print("*"*100)
+        print("1111")
+        print("*"*100)
+        return 
     except Exception as e:
         print(e)
+        print("*"*100)
+        print("fail")
+        print("*"*100)
         return 1
 
 
