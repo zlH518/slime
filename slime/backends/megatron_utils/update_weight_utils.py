@@ -390,7 +390,7 @@ class UpdateWeightFromDistributed:
             )
 
         if converted_named_tensors:
-            self._update_bucket_weights_from_distributed(converted_named_tensors, pbar=pbar)
+            await self._update_bucket_weights_from_distributed(converted_named_tensors, pbar=pbar)
 
         dist.barrier(group=get_gloo_group())
 

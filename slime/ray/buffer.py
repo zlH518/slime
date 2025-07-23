@@ -260,7 +260,7 @@ class Buffer:
     def get_buffer_length(self):
         return len(self.buffer)
 
-    async def save(self, rollout_id):
+    def save(self, rollout_id):
         if not self.args.rollout_global_dataset:
             return
 

@@ -82,14 +82,12 @@ class RayTrainGroup:
                 master_addr, master_port = ray.get(actor.get_master_addr_and_port.remote())
             self._actor_handlers.append(actor)
 
-    async def async_init(self, args, role, with_ref=False):
+    def async_init(self, args, role, with_ref=False):
         """
         Allocate GPU resourced and initialize model, optimzier, local ckpt, etc.
         """
         self.args = args
-        ref = [actor.init.remote(args, role, with_ref=with_ref) for actor in self._actor_handlers]
-        await asyncio.gather(*ref)
-        return ref
+        return [actor.init.remote(args, role, with_ref=with_ref) for actor in self._actor_handlers]
 
     async def async_init_weight_update_connections(self, rollout):
         """
@@ -117,7 +115,6 @@ class RayTrainGroup:
         ref = [
             actor.train.remote(rollout_id, with_data_fetching=with_data_fetching) for actor in self._actor_handlers
         ]
-        await asyncio.gather(*ref)
         return ref
 
     async def async_eval(self, rollout_id):
@@ -125,19 +122,13 @@ class RayTrainGroup:
         ref = [actor.eval.remote(rollout_id) for actor in self._actor_handlers]
         await asyncio.gather(*ref)
 
-    async def async_save_model(self, step_id):
+    def async_save_model(self, step_id):
         """Save actor model on rank 0."""
-        ref = [actor.save_model.remote(step_id) for actor in self._actor_handlers]
-        await asyncio.gather(*ref)
-        return ref
+        return [actor.save_model.remote(step_id) for actor in self._actor_handlers]
 
-    async def async_update_weights(self):
+    def async_update_weights(self):
         """Broadcast weights from rank 0 to all other ranks."""
-        ref = [actor.update_weights.remote() for actor in self._actor_handlers]
-        await asyncio.gather(*ref)
-        return ref
+        return [actor.update_weights.remote() for actor in self._actor_handlers]
 
-    async def async_offload(self):
-        ref = [actor.sleep.remote(("model")) for actor in self._actor_handlers]
-        await asyncio.gather(*ref)
-        return ref
+    def async_offload(self):
+        return [actor.sleep.remote(("model")) for actor in self._actor_handlers]

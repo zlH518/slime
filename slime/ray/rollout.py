@@ -202,7 +202,7 @@ class RolloutGroup:
         # If router ip is specified, use the specified launched router
         print(f"SGLang router launched at {self.args.sglang_router_ip}:{self.args.sglang_router_port}")
 
-    async def async_generate(self, rollout_id, evaluation=False):
+    def async_generate(self, rollout_id, evaluation=False):
         return self.data_buffer.generate.remote(rollout_id, evaluation=evaluation)
 
     async def async_reset_prefix_cache(self):
@@ -210,12 +210,8 @@ class RolloutGroup:
         await asyncio.gather(*ref)
         return ref
 
-    async def async_offload(self):
-        ref = [engine.sleep.remote() for engine in self.rollout_engines]
-        await asyncio.gather(*ref)
-        return ref
+    def async_offload(self):
+        return [engine.sleep.remote() for engine in self.rollout_engines]
 
-    async def async_onload(self):
-        ref = [engine.wake_up.remote() for engine in self.rollout_engines]
-        await asyncio.gather(*ref)
-        return ref
+    def async_onload(self):
+        return [engine.wake_up.remote() for engine in self.rollout_engines]

@@ -39,9 +39,9 @@ class Task:
         assert self.args.num_rollout > 0
 
         # sync the initialization (model initalization, load checkpoint, etc.)
-        start_rollout_ids = await self.actor_model.async_init(
+        start_rollout_ids = await asyncio.gather(*(self.actor_model.async_init(
             self.args,role="actor",with_ref=self.args.kl_coef != 0 or self.args.use_kl_loss
-        )
+        )))
         assert len(set(start_rollout_ids)) == 1
         if self.args.start_rollout_id is None:
             self.args.start_rollout_id = start_rollout_ids[0]
@@ -52,8 +52,8 @@ class Task:
         await self.actor_model.async_init_weight_update_connections(self.rollout_generator)
 
         if self.args.offload:
-            await self.rollout_generator.async_onload()
+            await asyncio.gather(*(self.rollout_generator.async_onload()))
 
-        # await self.actor_model.async_update_weights()
+        await asyncio.gather(*(self.actor_model.async_update_weights()))
 
         self.start_rollout_ids=start_rollout_ids
