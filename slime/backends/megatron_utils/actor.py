@@ -1,5 +1,6 @@
 import ray
 import torch
+import asyncio
 import torch.distributed as dist
 
 if torch.version.hip:
@@ -105,7 +106,7 @@ class MegatronTrainRayActor(TrainRayActor):
         torch.cuda.synchronize()
 
     @timer
-    def sleep(self, tags):
+    async def sleep(self, tags):
         assert self.args.offload
         assert "model" in tags
         if isinstance(tags, str):
@@ -136,11 +137,11 @@ class MegatronTrainRayActor(TrainRayActor):
         clear_memory()
         print_memory("after wake_up model")
 
-    def set_data_buffer(self, data_buffer):
+    async def set_data_buffer(self, data_buffer):
         self.data_buffer = data_buffer
         if getattr(self.args, "use_wandb", False) and getattr(self.args, "wandb_run_id", None):
             print(f"Updating buffer's wandb run_id to: {self.args.wandb_run_id}")
-            ray.get(self.data_buffer.update_wandb_run_id.remote(self.args.wandb_run_id))
+            await self.data_buffer.update_wandb_run_id.remote(self.args.wandb_run_id)
 
     def get_rollout_data(self, rollout_id, rollout_data):
         # Fetch data through ray on CPU, not sure if this will be performance bottleneck.
@@ -178,7 +179,7 @@ class MegatronTrainRayActor(TrainRayActor):
                 rollout_data=rollout_data,
             )
 
-    def train(self, rollout_id, with_data_fetching=True):
+    async def train(self, rollout_id, with_data_fetching=True):
         Timer().end("train_wait")
 
         rollout_data = {}
@@ -261,7 +262,7 @@ class MegatronTrainRayActor(TrainRayActor):
         # TODO: is logging enough?
         log_eval_data(rollout_id, self.args, self.data_buffer)
 
-    def save_model(self, iteration, with_optimizer=True):
+    async def save_model(self, iteration, with_optimizer=True):
         if self.args.debug_rollout_only:
             return
 
@@ -280,7 +281,7 @@ class MegatronTrainRayActor(TrainRayActor):
         dist.barrier(group=get_gloo_group())
 
     @timer
-    def update_weights(self):
+    async def update_weights(self):
         if self.args.debug_train_only or self.args.debug_rollout_only:
             return
 

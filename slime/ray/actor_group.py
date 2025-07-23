@@ -28,11 +28,14 @@ class RayTrainGroup:
         num_gpus_per_node,
         pg: tuple[PlacementGroup, list[int]],
         num_gpus_per_actor=1,
+        task_id:int = None,
         resources: Dict[str, float] = None,
         num_resources_per_node: int = None,
     ) -> None:
         self._num_nodes = num_nodes
         self._num_gpus_per_node = num_gpus_per_node
+        
+        self._task_id = task_id
 
         # custom resources, see https://docs.ray.io/en/latest/ray-core/scheduling/resources.html
         self._resources = resources
@@ -46,7 +49,7 @@ class RayTrainGroup:
 
         # Use placement group to lock resources for models of same type
         assert pg is not None
-        pg, reordered_bundle_indices = pg
+        pg, offset, reordered_bundle_indices = pg
 
         TrainRayActor = ray.remote(
             num_gpus=1,
@@ -73,7 +76,7 @@ class RayTrainGroup:
                     placement_group=pg,
                     placement_group_bundle_index=reordered_bundle_indices[rank],
                 ),
-            ).remote(world_size, rank, master_addr, master_port)
+            ).remote(world_size, rank, master_addr, master_port, offset+rank, task_id = self._task_id)
             if rank == 0:
                 master_addr, master_port = ray.get(actor.get_master_addr_and_port.remote())
             self._actor_handlers.append(actor)
@@ -85,13 +88,13 @@ class RayTrainGroup:
         self.args = args
         return [actor.init.remote(args, role, with_ref=with_ref) for actor in self._actor_handlers]
 
-    def async_init_weight_update_connections(self, rollout):
+    async def async_init_weight_update_connections(self, rollout):
         """
         Connect rollout engines and actors, e.g. initialize the process group between them
         to update weights after each training stage.
         """
         self.rollout = rollout
-        ray.get([actor.set_data_buffer.remote(rollout.data_buffer) for actor in self._actor_handlers])
+        await asyncio.gather(*[actor.set_data_buffer.remote(rollout.data_buffer) for actor in self._actor_handlers])
 
         return [
             actor.connect_rollout_engines.remote(
@@ -104,7 +107,7 @@ class RayTrainGroup:
     def get_rollout_data(self, rollout_id):
         ray.get([actor.get_rollout_data.remote(rollout_id) for actor in self._actor_handlers])
 
-    def async_train(self, rollout_id, with_data_fetching=True):
+    async def async_train(self, rollout_id, with_data_fetching=True):
         """Do one rollout training"""
         return [
             actor.train.remote(rollout_id, with_data_fetching=with_data_fetching) for actor in self._actor_handlers
@@ -114,13 +117,13 @@ class RayTrainGroup:
         """Evaluate the model"""
         return [actor.eval.remote(rollout_id) for actor in self._actor_handlers]
 
-    def async_save_model(self, step_id):
+    async def async_save_model(self, step_id):
         """Save actor model on rank 0."""
         return [actor.save_model.remote(step_id) for actor in self._actor_handlers]
 
-    def async_update_weights(self):
+    async def async_update_weights(self):
         """Broadcast weights from rank 0 to all other ranks."""
         return [actor.update_weights.remote() for actor in self._actor_handlers]
 
-    def async_offload(self):
+    async def async_offload(self):
         return [actor.sleep.remote(("model")) for actor in self._actor_handlers]

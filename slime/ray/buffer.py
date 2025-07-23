@@ -71,7 +71,7 @@ class Buffer:
         assert self.args.rollout_global_dataset
         return len(self.dataset) // self.args.rollout_batch_size
 
-    def update_wandb_run_id(self, run_id):
+    async def update_wandb_run_id(self, run_id):
         """Update wandb run_id and initialize wandb"""
         self.args.wandb_run_id = run_id
         self._init_wandb()  # Now initialize wandb with the correct run_id
@@ -175,7 +175,7 @@ class Buffer:
             group = samples[i : i + self.args.n_samples_per_prompt]
             self.buffer.append(group)
 
-    def generate(self, rollout_id, evaluation=False):
+    async def generate(self, rollout_id, evaluation=False):
         self.rollout_id = rollout_id
         if self.args.debug_train_only and evaluation:
             # if debug train only, we don't generate evaluation data
@@ -260,7 +260,7 @@ class Buffer:
     def get_buffer_length(self):
         return len(self.buffer)
 
-    def save(self, rollout_id):
+    async def save(self, rollout_id):
         if not self.args.rollout_global_dataset:
             return
 

@@ -1,6 +1,9 @@
+import os
 import multiprocessing
 import random
 import time
+import math
+import asyncio
 
 import ray
 from ray.util.scheduling_strategies import PlacementGroupSchedulingStrategy
@@ -14,9 +17,10 @@ from .utils import Lock
 
 @ray.remote
 class RolloutRayActor(RayActor):
-    def __init__(self, args, rank: int):
+    def __init__(self, args, rank: int, global_rank):
         self.args = args
         self.rank = rank
+        os.environ["GLOBAL_RANK"] = str(global_rank)
 
     def init(self, dist_init_addr, port, nccl_port):
         # build infer engine
@@ -66,7 +70,7 @@ def create_rollout_engines(args, pg):
     num_gpu_per_engine = min(args.rollout_num_gpus_per_engine, 8)
     num_engines = args.rollout_num_gpus // num_gpu_per_engine
 
-    pg, reordered_bundle_indices = pg
+    pg, offset, reordered_bundle_indices = pg
 
     rollout_engines = []
     for i in range(num_engines):
@@ -84,7 +88,7 @@ def create_rollout_engines(args, pg):
                 num_cpus=num_cpus,
                 num_gpus=num_gpus,
                 scheduling_strategy=scheduling_strategy,
-            ).remote(args, rank=i)
+            ).remote(args, rank=i, global_rank=math.floor(i*num_gpu_per_engine+offset))
         )
 
     # get ports
@@ -175,7 +179,7 @@ class RolloutGroup:
         from sglang_router.launch_router import RouterArgs
 
         self.args.sglang_router_ip = get_host_info()[1]
-        self.args.sglang_router_port = find_available_port(random.randint(3000, 4000))
+        self.args.sglang_router_port = find_available_port(random.randint(3000, 6000))
 
         router_args = RouterArgs(
             host=self.args.sglang_router_ip,
@@ -198,13 +202,13 @@ class RolloutGroup:
         # If router ip is specified, use the specified launched router
         print(f"SGLang router launched at {self.args.sglang_router_ip}:{self.args.sglang_router_port}")
 
-    def async_generate(self, rollout_id, evaluation=False):
+    async def async_generate(self, rollout_id, evaluation=False):
         return self.data_buffer.generate.remote(rollout_id, evaluation=evaluation)
 
     def async_reset_prefix_cache(self):
         return [engine.reset_prefix_cache.remote() for engine in self.rollout_engines]
 
-    def async_offload(self):
+    async def async_offload(self):
         return [engine.sleep.remote() for engine in self.rollout_engines]
 
     def async_onload(self):

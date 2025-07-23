@@ -1,5 +1,7 @@
 import socket
 import ray
+import asyncio
+
 from ray.util.placement_group import placement_group
 from ray.util.scheduling_strategies import PlacementGroupSchedulingStrategy
 
@@ -91,17 +93,21 @@ def create_placement_groups(args):
     rollout_pg_reordered_bundle_indices = actor_pg_reordered_bundle_indices[rollout_offset:]
 
     return {
-        "actor": (pg, actor_pg_reordered_bundle_indices),
-        "rollout": (pg, rollout_pg_reordered_bundle_indices),
+        "actor": (pg, 0, actor_pg_reordered_bundle_indices),
+        "rollout": (pg, rollout_offset, rollout_pg_reordered_bundle_indices),
     }
 
 
 def allocate_train_group(num_nodes, num_gpus_per_node, pg):
+    # TODO: need to cacluate
+    num_gpus_per_actor = 0.8
+
     return RayTrainGroup(
         num_nodes=num_nodes,
         num_gpus_per_node=num_gpus_per_node,
         pg=pg,
-        num_gpus_per_actor=0.8,
+        num_gpus_per_actor=num_gpus_per_actor,
+        task_id=task_id,
     )
 
 
@@ -110,6 +116,7 @@ def create_actor_group(args, pg):
         num_nodes=args.actor_num_nodes,
         num_gpus_per_node=args.actor_num_gpus_per_node,
         pg=pg,
+        task_id=args.task_id,
     )
     return actor_model
 
