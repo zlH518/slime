@@ -105,37 +105,37 @@ class MegatronTrainRayActor(TrainRayActor):
                 param.copy_(params_dict[name], non_blocking=True)
             torch.cuda.synchronize()
 
-    @timer
     def sleep(self, tags):
-        assert self.args.offload
-        assert "model" in tags
-        if isinstance(tags, str):
-            tags = (tags,)
+        with timer("sleep"):
+            assert self.args.offload
+            assert "model" in tags
+            if isinstance(tags, str):
+                tags = (tags,)
 
-        clear_memory()
-        print_memory(f"before offload model")
-        self.update_cpu_params_dict(self.weights["actor"])
+            clear_memory()
+            print_memory(f"before offload model")
+            self.update_cpu_params_dict(self.weights["actor"])
 
-        allocator = CuMemAllocator.get_instance()
-        allocator.sleep(offload_tags=tags)
+            allocator = CuMemAllocator.get_instance()
+            allocator.sleep(offload_tags=tags)
 
-        clear_memory()
-        print_memory(f"after offload model")
+            clear_memory()
+            print_memory(f"after offload model")
 
-    @timer
     def wake_up(self, tags):
-        assert self.args.offload
-        clear_memory()
-        print_memory("before wake_up model")
+        with timer("wake up"):
+            assert self.args.offload
+            clear_memory()
+            print_memory("before wake_up model")
 
-        if isinstance(tags, str):
-            tags = (tags,)
+            if isinstance(tags, str):
+                tags = (tags,)
 
-        allocator = CuMemAllocator.get_instance()
-        allocator.wake_up(tags)
+            allocator = CuMemAllocator.get_instance()
+            allocator.wake_up(tags)
 
-        clear_memory()
-        print_memory("after wake_up model")
+            clear_memory()
+            print_memory("after wake_up model")
 
     async def set_data_buffer(self, data_buffer):
         self.data_buffer = data_buffer
@@ -280,20 +280,20 @@ class MegatronTrainRayActor(TrainRayActor):
         await self.weight_updator.connect_rollout_engines(rollout_engines, rollout_engine_lock)
         dist.barrier(group=get_gloo_group())
 
-    @timer
-    def update_weights(self):
-        if self.args.debug_train_only or self.args.debug_rollout_only:
-            return
+    async def update_weights(self):
+        with timer("update_weight"):
+            if self.args.debug_train_only or self.args.debug_rollout_only:
+                return
 
-        torch.cuda.empty_cache()
-        await self.weight_updator.update_weights()
-        dist.barrier(group=get_gloo_group())
-        clear_memory()
-        print_memory("after update_weights")
+            torch.cuda.empty_cache()
+            await self.weight_updator.update_weights()
+            dist.barrier(group=get_gloo_group())
+            clear_memory()
+            print_memory("after update_weights")
 
-        if getattr(self.args, "keep_old_actor", False):
-            print("update rollout model on cpu using actor model")
-            await self.update_cpu_params_dict(self.weights["old_actor"])
+            if getattr(self.args, "keep_old_actor", False):
+                print("update rollout model on cpu using actor model")
+                self.update_cpu_params_dict(self.weights["old_actor"])
 
     def load_other_checkpoint(self, model_tag, path):
         old_args = self.args.load, self.args.no_load_optim, self.args.no_load_rng, self.args.finetune

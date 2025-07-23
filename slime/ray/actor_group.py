@@ -54,6 +54,7 @@ class RayTrainGroup:
 
         TrainRayActor = ray.remote(
             num_gpus=1,
+            max_concurrency=4,
             runtime_env={
                 "env_vars": {
                     # because sglang will always set NCCL_CUMEM_ENABLE to 0
@@ -107,15 +108,12 @@ class RayTrainGroup:
         await asyncio.gather(*ref)
         return ref
 
-    async def get_rollout_data(self, rollout_id):
-        await asyncio.gather(*[actor.get_rollout_data.remote(rollout_id) for actor in self._actor_handlers])
+    def get_rollout_data(self, rollout_id):
+       return [actor.get_rollout_data.remote(rollout_id) for actor in self._actor_handlers]
 
-    async def async_train(self, rollout_id, with_data_fetching=True):
+    def async_train(self, rollout_id, with_data_fetching=True):
         """Do one rollout training"""
-        ref = [
-            actor.train.remote(rollout_id, with_data_fetching=with_data_fetching) for actor in self._actor_handlers
-        ]
-        return ref
+        return [actor.train.remote(rollout_id, with_data_fetching=with_data_fetching) for actor in self._actor_handlers]
 
     async def async_eval(self, rollout_id):
         """Evaluate the model"""
@@ -128,7 +126,9 @@ class RayTrainGroup:
 
     def async_update_weights(self):
         """Broadcast weights from rank 0 to all other ranks."""
-        return [actor.update_weights.remote() for actor in self._actor_handlers]
+        result = [actor.update_weights.remote() for actor in self._actor_handlers]
+        print("async_update_weights result types:", [type(r) for r in result])
+        return result
 
     def async_offload(self):
         return [actor.sleep.remote(("model")) for actor in self._actor_handlers]

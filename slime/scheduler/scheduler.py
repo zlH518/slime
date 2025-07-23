@@ -49,7 +49,7 @@ class Scheduler:
                     await asyncio.gather(*(self.tasks[task_id].rollout_generator.async_offload()))
 
             async with self.train_lock:
-                await asyncio.gather(*(self.tasks[task_id].actor_model.async_train(rollout_id)))
+                await asyncio.gather(*self.tasks[task_id].actor_model.async_train(rollout_id))
 
                 if args.save_interval is not None and (
                     (rollout_id + 1) % args.save_interval == 0
