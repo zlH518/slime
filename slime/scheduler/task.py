@@ -2,7 +2,6 @@ import ray
 import asyncio
 from ray.util.placement_group import placement_group
 from slime.ray.placement_group import (create_actor_group,create_rollout_group)
-from tracer import tracepoint_module_setup,TracePoint
 
 class Task:
     _task_id = 0

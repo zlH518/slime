@@ -4,7 +4,6 @@ import asyncio
 from slime.utils.misc import Singleton
 
 from .task import Task
-from tracer import tracepoint_module_setup, TracePoint
 
 
 class Scheduler(Singleton):
