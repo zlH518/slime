@@ -74,7 +74,7 @@ class Scheduler:
                     tp.end()
                     
                     if args.rollout_global_dataset:
-                        tp = TracePoint(f"task-{task_id}: data buffer save data". "1")
+                        tp = TracePoint(f"task-{task_id}: data buffer save data", "1")
                         tp.begin()
                         await self.tasks[task_id].rollout_generator.data_buffer.save.remote(rollout_id)
                         tp.end()
