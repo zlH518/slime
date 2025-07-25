@@ -13,6 +13,8 @@ from slime.utils.data import Dataset
 from slime.utils.misc import load_function
 from slime.utils.types import Sample
 
+from tracer import vinit, TracePoint, MemTracePoint
+
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
 
@@ -66,6 +68,7 @@ class Buffer:
         self.eval_generate_rollout = load_function(self.args.eval_function_path)
         print(f"import {self.args.rollout_function_path} as generate_rollout function.")
         print(f"import {self.args.eval_function_path} as eval_generate_rollout function.")
+        vinit()
 
     def get_num_rollout_per_epoch(self):
         assert self.args.rollout_global_dataset

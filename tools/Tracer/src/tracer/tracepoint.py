@@ -1,9 +1,6 @@
 import os
 import logging
 
-from .utils import create_logger, logger_path
-
-_tracepoint_initialized = False
 
 class TracePointFormatter(logging.Formatter):
     def __init__(self):
@@ -70,15 +67,3 @@ class TracePoint:
 
 
 
-def tracepoint_module_setup():
-    global _tracepoint_initialized
-    if _tracepoint_initialized:
-        return
-
-    default_formatter = logging.Formatter(
-        fmt="[%(levelname)s][%(process)d][%(name)s][%(asctime)s] %(message)s"
-    )
-
-    create_logger(logger_path, "TracePoint", TracePointFormatter())
-
-    _tracepoint_initialized = True

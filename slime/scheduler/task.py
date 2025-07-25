@@ -3,6 +3,8 @@ import asyncio
 from ray.util.placement_group import placement_group
 from slime.ray.placement_group import (create_actor_group,create_rollout_group)
 
+from tracer import vinit, TracePoint, MemoryTracePoint
+
 class Task:
     _task_id = 0
 
@@ -15,6 +17,7 @@ class Task:
         self.task_id = Task._task_id
         Task._task_id = Task._task_id + 1
         assert Task._task_id <= self.args.tasks_num
+        vinit()
 
         self.actor_model = create_actor_group(
                 args=self.args,
@@ -27,6 +30,8 @@ class Task:
             )
 
     async def init(self):
+        tp = TracePoint(f"task-{self.task_id}: init task", "1")
+        tp.begin()
         self.num_rollout_per_epoch = None
         if self.args.num_rollout is None:
             self.num_rollout_per_epoch = await self.rollout_generator.data_buffer.get_num_rollout_per_epoch.remote()
@@ -52,3 +57,4 @@ class Task:
         await asyncio.gather(*(self.actor_model.async_update_weights()))
 
         self.start_rollout_ids=start_rollout_ids
+        tp.end()

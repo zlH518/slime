@@ -14,6 +14,8 @@ from slime.ray.ray_actor import RayActor
 from slime.utils.http_utils import find_available_port, get_host_info, run_router
 from .utils import Lock
 
+from tracer import vinit, TracePoint, MemTracePoint
+
 
 @ray.remote
 class RolloutRayActor(RayActor):
@@ -21,6 +23,7 @@ class RolloutRayActor(RayActor):
         self.args = args
         self.rank = rank
         os.environ["GLOBAL_RANK"] = str(global_rank)
+        vinit()
 
     def init(self, dist_init_addr, port, nccl_port):
         # build infer engine
@@ -105,7 +108,7 @@ def create_rollout_engines(args, pg):
 
         def get_addr_and_ports():
             # use small ports to prevent ephemeral port between 32768 and 65536.
-            start_port = 10000+args.task_id*100
+            start_port = 10000+args.task_id*1000+rank*100
 
             def port(consecutive=10):
                 nonlocal start_port
@@ -171,6 +174,7 @@ class RolloutGroup:
             num_cpus=1,
             num_gpus=0,
         ).remote()
+        vinit()
 
     def start_router(self):
         if self.args.sglang_router_ip is not None:

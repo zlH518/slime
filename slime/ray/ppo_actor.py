@@ -8,6 +8,8 @@ import torch.distributed as dist
 
 from slime.ray.ray_actor import RayActor
 
+from tracer import vinit, TracePoint, MemTracePoint
+
 
 class TrainRayActor(RayActor):
     def __init__(self, world_size, rank, master_addr, master_port, global_rank, task_id):
@@ -28,6 +30,8 @@ class TrainRayActor(RayActor):
         # os.environ["LOCAL_RANK"] = str(ray.get_gpu_ids()[0])
         os.environ["LOCAL_RANK"] = str(ray.get_gpu_ids()[0])
         os.environ["GLOBAL_RANK"] = str(global_rank)
+        vinit()
+        MemTracePoint.record()
 
     def init(self, args, role, with_ref=False):
         self.args = args

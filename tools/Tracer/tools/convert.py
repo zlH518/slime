@@ -17,13 +17,13 @@ parser.add_argument(
     "--input-file",
     help="Input log file path (e.g., rank_0.log)",
     type=str,
-    default = "/volume/pt-train/users/mingjie/hzl_code/code/PipeEngine_v0_add_log/data/experiments/log/TracePoint/TracePoint"
+    default = "/volume/pt-train/users/mingjie/hzl_code/code/slime/experiments/log/TracePoint/TracePoint"
 )
 parser.add_argument(
     "--output-file",
     help="Output JSON file path (e.g., trace.json)",
     type=str,
-    default = "/volume/pt-train/users/mingjie/hzl_code/code/PipeEngine_v0_add_log/data/experiments/json/722-1task-1"
+    default = "/volume/pt-train/users/mingjie/hzl_code/code/slime/experiments/log/json/724-2task-1"
 )
 parser.add_argument(
     "--min-time",
@@ -72,25 +72,10 @@ class MemoryEvent:
     def to_dict(self) -> Dict[str, Any]:
         return {
             "ts": self.timestamp,
-            "name": "GPUMem",
+            "name": "GPUMemUsed",
             "pid": self.process_id,
             "ph": "C",
             "args": {"Free": self.memory},
-        }
-    
-@dataclass
-class GpuUtilizationEvent:
-    timestamp: int
-    process_id: str
-    utilization: int
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "ts": self.timestamp,
-            "name": "GPUMem",
-            "pid": self.process_id,
-            "ph": "C",
-            "args": {"Utilization": self.utilization},
         }
 
 
@@ -112,20 +97,13 @@ def parse_trace_line(line: str, type: str):
             phase = parts[5]
 
             return TraceEvent(timestamp, process_id, thread_id, category, name, phase)
-        elif type == "Memory":
+        elif type == "MemTracePoint":
             timestamp = int(parts[0])  # default is microsecond
             if timestamp == 0:
                 return None
             process_id = "rank" + str(int(parts[1]))
             memory = int(parts[2]) / 1024 / 1024
             return MemoryEvent(timestamp, process_id, memory)
-        elif type == "GpuUtilization":
-            timestamp = int(parts[0])  # default is microsecond
-            if timestamp == 0:
-                return None
-            process_id = "rank" + str(int(parts[1]))
-            utilization = int(parts[2])
-            return GpuUtilizationEvent(timestamp, process_id, utilization)
 
         return None
     except (ValueError, IndexError):
@@ -204,10 +182,9 @@ def process_trace_data(
     type: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """Process trace data and convert to Chrome Trace format."""
-    assert type in ["TracePoint", "Memory", "GpuUtilization"], "Invalid type specified"
+    assert type in ["TracePoint", "MemoryTracePoint"], "Invalid type specified"
     trace_events = []
     memory_events = []
-    gpu_events = []
 
     with open(input_file, "r") as f:
         for line_num, line in enumerate(f, 1):
@@ -229,8 +206,6 @@ def process_trace_data(
                 trace_events.append(event)
             elif isinstance(event, MemoryEvent):
                 memory_events.append(event)
-            elif isinstance(event, GpuUtilizationEvent):
-                gpu_events.append(event)
 
     # Filter incomplete events if requested
     trace_events = filter_incomplete_events(trace_events)
@@ -239,7 +214,6 @@ def process_trace_data(
     all_events = []
     all_events.extend([event.to_dict() for event in trace_events])
     all_events.extend([event.to_dict() for event in memory_events])
-    all_events.extend([event.to_dict() for event in gpu_events])
 
     return all_events
 
@@ -284,16 +258,7 @@ def main():
                         print(f" >> process file {root}/{file}")
                         all_events.extend(
                             process_trace_data(
-                                file_path, min_time=min_time, max_time=max_time, type="Memory"
-                            )
-                        )
-                elif "GPUTracePoint" in root:
-                    for file in files:
-                        file_path = os.path.join(root, file)
-                        print(f" >> process file {root}/{file}")
-                        all_events.extend(
-                            process_trace_data(
-                                file_path, min_time=min_time, max_time=max_time, type="GpuUtilization"
+                                file_path, min_time=min_time, max_time=max_time, type="MemTracePoint"
                             )
                         )
         else:

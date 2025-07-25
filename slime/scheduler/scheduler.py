@@ -2,7 +2,7 @@ import ray
 import asyncio
 
 from .task import Task
-from tracer import tracepoint_module_setup, TracePoint
+from tracer import vinit, TracePoint
 
 class Scheduler:
     """
@@ -23,7 +23,7 @@ class Scheduler:
         self.pgs = args.pgs
 
         self.tasks = [Task(args) for args in self.tasks_args]
-        tracepoint_module_setup()
+        vinit()
 
 
     async def init_task(self):

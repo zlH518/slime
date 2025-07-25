@@ -1,5 +1,5 @@
 
-_ROOT_LOGGER_PATH = "/volume/pt-train/users/mingjie/hzl_code/code/slime/experiments/log/TracePoint"
+_ROOT_LOGGER_PATH = "/volume/pt-train/users/mingjie/hzl_code/code/slime/experiments/log/"
 
 def torch_available():
     """
