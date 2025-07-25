@@ -159,6 +159,7 @@ def create_rollout_engines(args, pg):
 
 class RolloutGroup:
     def __init__(self, args, pg):
+        vinit()
         self.args = args
         self.start_router()
         self.data_buffer = Buffer.options(
@@ -174,7 +175,6 @@ class RolloutGroup:
             num_cpus=1,
             num_gpus=0,
         ).remote()
-        vinit()
 
     def start_router(self):
         if self.args.sglang_router_ip is not None:

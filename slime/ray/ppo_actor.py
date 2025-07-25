@@ -13,6 +13,10 @@ from tracer import vinit, TracePoint, MemTracePoint
 
 class TrainRayActor(RayActor):
     def __init__(self, world_size, rank, master_addr, master_port, global_rank, task_id):
+        os.environ["GLOBAL_RANK"] = str(global_rank)
+        vinit()
+        tp = TracePoint(f"task-{task_id}-rank-{rank}: init TrainRayActor", "1")
+        tp.begin()
         self._world_size = world_size
         self._rank = rank
         self._task_id = task_id
@@ -29,9 +33,8 @@ class TrainRayActor(RayActor):
         # os.environ.pop("CUDA_VISIBLE_DEVICES", None)
         # os.environ["LOCAL_RANK"] = str(ray.get_gpu_ids()[0])
         os.environ["LOCAL_RANK"] = str(ray.get_gpu_ids()[0])
-        os.environ["GLOBAL_RANK"] = str(global_rank)
-        vinit()
-        MemTracePoint.record()
+        MemTracePoint.record("create actor")
+        tp.end()
 
     def init(self, args, role, with_ref=False):
         self.args = args

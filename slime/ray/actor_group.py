@@ -7,7 +7,7 @@ from ray.util.placement_group import PlacementGroup
 from ray.util.scheduling_strategies import PlacementGroupSchedulingStrategy
 
 from slime.backends.megatron_utils import MegatronTrainRayActor
-
+from tracer import vinit, TracePoint, MemTracePoint
 
 class RayTrainGroup:
     """
@@ -33,6 +33,7 @@ class RayTrainGroup:
         resources: Dict[str, float] = None,
         num_resources_per_node: int = None,
     ) -> None:
+        vinit()
         self._num_nodes = num_nodes
         self._num_gpus_per_node = num_gpus_per_node
         
@@ -46,6 +47,8 @@ class RayTrainGroup:
         self._allocate_gpus_for_actor(pg, num_gpus_per_actor)
 
     def _allocate_gpus_for_actor(self, pg, num_gpus_per_actor):
+        tp = TracePoint(f"task-{self._task_id}: allocate gpus for actor", "1")
+        tp.begin()
         world_size = self._num_nodes * self._num_gpus_per_node
 
         # Use placement group to lock resources for models of same type
@@ -82,6 +85,7 @@ class RayTrainGroup:
             if rank == 0:
                 master_addr, master_port = ray.get(actor.get_master_addr_and_port.remote())
             self._actor_handlers.append(actor)
+        tp.end()
 
     def async_init(self, args, role, with_ref=False):
         """

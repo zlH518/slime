@@ -3,31 +3,40 @@ import asyncio
 from ray.util.placement_group import placement_group
 from slime.ray.placement_group import (create_actor_group,create_rollout_group)
 
-from tracer import vinit, TracePoint, MemoryTracePoint
+from tracer import vinit, TracePoint, MemTracePoint
 
 class Task:
     _task_id = 0
 
     def __init__(self, args):
         self.args = args
-        self.pgs = args.pgs
-        self.tasks_num = args.tasks_num
-
         self.args.task_id = Task._task_id
         self.task_id = Task._task_id
         Task._task_id = Task._task_id + 1
         assert Task._task_id <= self.args.tasks_num
         vinit()
+        tp = TracePoint(f"task-{self.task_id}: task _init_", "1")
 
+        self.pgs = args.pgs
+        self.tasks_num = args.tasks_num
+
+        amp = TracePoint(f"task-{self.task_id}: create actor group", "1")
+        amp.begin()
         self.actor_model = create_actor_group(
                 args=self.args,
                 pg=self.pgs["actor"]
             )
+        amp.end()
 
+        rgp = TracePoint(f"task-{self.task_id}: create rollout group", "1")
+        rgp.begin()
         self.rollout_generator = create_rollout_group(
                 args=self.args,
                 pg=self.pgs["rollout"],
             )
+        rgp.end()
+        
+        tp.end()
 
     async def init(self):
         tp = TracePoint(f"task-{self.task_id}: init task", "1")
