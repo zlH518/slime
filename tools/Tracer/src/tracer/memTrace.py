@@ -15,9 +15,10 @@ class MemTracePointFormatter(logging.Formatter):
         try:
             format_str = ",".join(
                 [
-                    str(int(record.created * 1000000)),  
-                    str(self.pid),  
-                    record.getMessage(),  
+                    str(int(record.created * 1000000)),
+                    str(self.pid),
+                    record.getMessage(),
+                    str(record.used),
                 ]
             )
         except Exception as e:
@@ -41,7 +42,7 @@ class MemTracePoint:
             cls._is_cuda_env = False
 
     @staticmethod
-    def record():
+    def record(event_name: str):
         if not MemTracePoint._is_cuda_env:
             return
             
@@ -49,4 +50,9 @@ class MemTracePoint:
 
         free, total = torch.cuda.mem_get_info(torch.cuda.current_device())
 
-        MemTracePoint._logger.info(f"{total-free}")
+        MemTracePoint._logger.info(
+            event_name,
+            extra={
+                "used": total-free,
+            }
+        )

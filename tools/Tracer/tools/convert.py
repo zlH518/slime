@@ -17,13 +17,13 @@ parser.add_argument(
     "--input-file",
     help="Input log file path (e.g., rank_0.log)",
     type=str,
-    default = "/volume/pt-train/users/mingjie/hzl_code/code/slime/experiments/log/TracePoint/TracePoint"
+    default = "/volume/pt-train/users/mingjie/hzl_code/code/slime/experiments/log/"
 )
 parser.add_argument(
     "--output-file",
     help="Output JSON file path (e.g., trace.json)",
     type=str,
-    default = "/volume/pt-train/users/mingjie/hzl_code/code/slime/experiments/log/json/724-2task-1"
+    default = "/volume/pt-train/users/mingjie/hzl_code/code/slime/experiments/json/725-2task-1"
 )
 parser.add_argument(
     "--min-time",
@@ -67,15 +67,18 @@ class TraceEvent:
 class MemoryEvent:
     timestamp: int
     process_id: str
-    memory: int
+    name: str         
+    used_memory: float                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "ts": self.timestamp,
-            "name": "GPUMemUsed",
+            "name": "Used Mem",
             "pid": self.process_id,
             "ph": "C",
-            "args": {"Free": self.memory},
+            "args": {
+                "used": self.used_memory,
+            },
         }
 
 
@@ -102,8 +105,9 @@ def parse_trace_line(line: str, type: str):
             if timestamp == 0:
                 return None
             process_id = "rank" + str(int(parts[1]))
-            memory = int(parts[2]) / 1024 / 1024
-            return MemoryEvent(timestamp, process_id, memory)
+            name = str(parts[2])
+            used_memory = float(int(parts[3]) / 1024 / 1024)
+            return MemoryEvent(timestamp, process_id, name, used_memory)
 
         return None
     except (ValueError, IndexError):
@@ -182,7 +186,7 @@ def process_trace_data(
     type: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """Process trace data and convert to Chrome Trace format."""
-    assert type in ["TracePoint", "MemoryTracePoint"], "Invalid type specified"
+    assert type in ["TracePoint", "MemTracePoint"], "Invalid type specified"
     trace_events = []
     memory_events = []
 
@@ -243,7 +247,7 @@ def main():
         if os.path.isdir(input_path):
             for root, dirs, files in os.walk(input_path):
                 # .*TracePoint
-                if "TracePoint" in root:
+                if "TracePoint" == root.split('/')[-1]:
                     for file in files:
                         file_path = os.path.join(root, file)
                         print(f" >> process file {root}/{file}")
@@ -252,7 +256,8 @@ def main():
                                 file_path, min_time=min_time, max_time=max_time, type="TracePoint"
                             )
                         )
-                elif "MemTracePoint" in root:
+                    print("tracepoint over")
+                elif "MemTracePoint" == root.split('/')[-1]:
                     for file in files:
                         file_path = os.path.join(root, file)
                         print(f" >> process file {root}/{file}")
@@ -261,6 +266,7 @@ def main():
                                 file_path, min_time=min_time, max_time=max_time, type="MemTracePoint"
                             )
                         )
+                    print("memtrainpoint over")
         else:
             exit("-1", f"Input path {input_path} is not a directory")
 
