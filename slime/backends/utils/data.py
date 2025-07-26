@@ -68,7 +68,7 @@ def get_minimum_num_micro_batch_size(total_lengths, max_tokens_per_gpu, cp_size)
     return len(batches)
 
 
-await def process_rollout_data(rollout_id, args, data_buffer, dp_rank, dp_size, rollout_data):
+async def process_rollout_data(rollout_id, args, data_buffer, dp_rank, dp_size, rollout_data):
     rank = dist.get_rank()
 
     if rank == 0:
