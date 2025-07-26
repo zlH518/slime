@@ -37,9 +37,9 @@ class TrainRayActor(RayActor):
         tp.end()
 
     def init(self, args, role, with_ref=False):
+        self.args = args
         tp = TracePoint(f"task-{self.args.task_id}: train actor init", "1")
         tp.begin()
-        self.args = args
         self.role = role
         self.with_ref = with_ref
 
