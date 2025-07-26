@@ -246,7 +246,7 @@ class MegatronTrainRayActor(TrainRayActor):
             wakeup_trace.begin()
             MemTracePoint.record("before wake up model")
             self.wake_up("model")
-            MemTracePoint("after wake up model")
+            MemTracePoint.record("after wake up model")
             wakeup_trace.end()
 
         with timer("train"):
