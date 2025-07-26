@@ -22,10 +22,15 @@ class RolloutRayActor(RayActor):
     def __init__(self, args, rank: int, global_rank):
         self.args = args
         self.rank = rank
+        self.global_rank = global_rank
         os.environ["GLOBAL_RANK"] = str(global_rank)
         vinit()
 
     def init(self, dist_init_addr, port, nccl_port):
+        tp = TracePoint(f"task-{self.args.task_id}: rollout actor init", "1")
+        tp.begin()
+        MemTracePoint.record("before init infer engine")
+
         # build infer engine
         self.infer_engine = SglangEngine(
             args=self.args,
@@ -33,11 +38,18 @@ class RolloutRayActor(RayActor):
             dist_init_addr=dist_init_addr,
             port=port,
             nccl_port=nccl_port,
+            task_id = task_id,
+            global_rank = global_rank
         )
+        MemTracePoint.record("after init infer engine")
 
         if self.args.offload:
+            MemTracePoint.record("before offload engine")
             # offload the engine to the CPU
             self.infer_engine.sleep()
+            MemTracePoint.record("after offload engine")
+
+        tp.end()
 
     def init_process_group(self, master_address, master_port, rank_offset, world_size, group_name, backend):
         return self.infer_engine.init_process_group(
@@ -45,28 +57,82 @@ class RolloutRayActor(RayActor):
         )
 
     def update_weights_from_distributed(self, names, dtypes, shapes, group_name):
-        return self.infer_engine.update_weights_from_distributed(names, dtypes, shapes, group_name)
+        tp = TracePoint(f"task-{self.args.task_id}: update weights from distributed", "1")
+        tp.begin()
+        MemTracePoint.record("before update weights from distributed")
+        
+        result = self.infer_engine.update_weights_from_distributed(names, dtypes, shapes, group_name)
+        
+        MemTracePoint.record("after update weights from distributed")
+        tp.end()
+        return result
 
     def update_weights_from_tensor(self, ipc_handles):
-        return self.infer_engine.update_weights_from_tensor(ipc_handles)
+        tp = TracePoint(f"task-{self.args.task_id}: update weights from tensor", "1")
+        tp.begin()
+        MemTracePoint.record("before update weights from tensor")
+        
+        result = self.infer_engine.update_weights_from_tensor(ipc_handles)
+        
+        MemTracePoint.record("after update weights from tensor")
+        tp.end()
+        return result
 
     def reset_prefix_cache(self):
+        tp = TracePoint(f"task-{self.args.task_id}: reset prefix cache", "1")
+        tp.begin()
+        MemTracePoint.record("before reset prefix cache")
+        
         self.infer_engine.reset_prefix_cache()
+        
+        MemTracePoint.record("after reset prefix cache")
+        tp.end()
 
     def sleep(self, level=1):
+        tp = TracePoint(f"task-{self.args.task_id}: rollout actor sleep", "1")
+        tp.begin()
+        MemTracePoint.record("before engine sleep")
+        
         self.infer_engine.sleep(level=level)
+        
+        MemTracePoint.record("after engine sleep")
+        tp.end()
 
     def wake_up(self):
+        tp = TracePoint(f"task-{self.args.task_id}: rollout actor wake up", "1")
+        tp.begin()
+        MemTracePoint.record("before engine wake up")
+        
         self.infer_engine.wake_up()
+        
+        MemTracePoint.record("after engine wake up")
+        tp.end()
 
     def pause_generation(self):
+        tp = TracePoint(f"task-{self.args.task_id}: rollout pause generation", "1")
+        tp.begin()
+        MemTracePoint.record("before pause generation")
+        
         self.infer_engine.pause_generation()
+        
+        MemTracePoint.record("after pause generation")
+        tp.end()
 
     def continue_generation(self):
+        tp = TracePoint(f"task-{self.args.task_id}: rollout continue generation", "1")
+        tp.begin()
+        MemTracePoint.record("before continue generation")
+        
         self.infer_engine.continue_generation()
+        
+        MemTracePoint.record("after continue generation")
+        tp.end()
 
 
 def create_rollout_engines(args, pg):
+    vinit()
+    tp = TracePoint(f"task-{args.task_id}: create_rollout_engines", "1")
+    tp.begin()
     if args.debug_train_only:
         return []
 
@@ -153,13 +219,15 @@ def create_rollout_engines(args, pg):
     # somehow if we don't sync here, the --debug-rollout-only mode will crash.
     init_handles = [engine.init.remote(**ports) for engine, ports in zip(rollout_engines, addr_and_ports)]
     ray.get(init_handles)
-
+    tp.end()
     return rollout_engines
 
 
 class RolloutGroup:
     def __init__(self, args, pg):
         vinit()
+        tp = TracePoint(f"task-{self.args.task_id}: init rollout group", "1")
+        tp.begin()
         self.args = args
         self.start_router()
         self.data_buffer = Buffer.options(
@@ -175,8 +243,11 @@ class RolloutGroup:
             num_cpus=1,
             num_gpus=0,
         ).remote()
+        tp.end()
 
     def start_router(self):
+        tp = TracePoint(f"task-{self.args.task_id}: start router", "1")
+        tp.begin()
         if self.args.sglang_router_ip is not None:
             return
 
@@ -214,6 +285,7 @@ class RolloutGroup:
         assert process.is_alive()
         # If router ip is specified, use the specified launched router
         print(f"SGLang router launched at {self.args.sglang_router_ip}:{self.args.sglang_router_port}")
+        tp.end()
 
     def async_generate(self, rollout_id, evaluation=False):
         return self.data_buffer.generate.remote(rollout_id, evaluation=evaluation)

@@ -329,6 +329,7 @@ class UpdateWeightFromDistributed:
         self.model_name = model_name
         self.vocab_size = vocab_size
         self.quantization_config = quantization_config
+        vinit()
 
     async def connect_rollout_engines(self, rollout_engines, rollout_engine_lock):
         self.rollout_engines = rollout_engines

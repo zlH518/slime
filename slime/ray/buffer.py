@@ -29,6 +29,9 @@ def pop_first(args, rollout_id, buffer: list[list[Sample]], num_samples: int) ->
 @ray.remote
 class Buffer:
     def __init__(self, args):
+        vinit()
+        tp = TracePoint(f"task-{self.args.task_id}", "1")
+        tp.begin()
         self.args = args
 
         # a list of sample group.
@@ -68,7 +71,8 @@ class Buffer:
         self.eval_generate_rollout = load_function(self.args.eval_function_path)
         print(f"import {self.args.rollout_function_path} as generate_rollout function.")
         print(f"import {self.args.eval_function_path} as eval_generate_rollout function.")
-        vinit()
+        tp.end()
+
 
     def get_num_rollout_per_epoch(self):
         assert self.args.rollout_global_dataset
@@ -120,11 +124,14 @@ class Buffer:
         """
         Return num_samples samples
         """
+        tp = TracePoint(f"task-{self.args.task_id}: buffer get samples", "1")
+        tp.begin()
 
         samples = self._get_samples_from_buffer(num_samples)
         num_samples -= len(samples)
 
         if num_samples == 0:
+            tp.end()
             return samples
 
         if self.dataset is not None:
@@ -157,6 +164,8 @@ class Buffer:
                     self.sample_index += 1
                     group.append(sample)
                 samples.append(group)
+
+        tp.end()
         return samples
 
     def _get_samples_from_buffer(self, num_samples: int) -> list[list[Sample]]:
@@ -170,7 +179,11 @@ class Buffer:
         """
         Add a sample group to buffer.
         """
+        tp = TracePoint(f"task-{self.args.task_id}: buffer add samples", "1")
+        tp.begin()
+
         if not samples:
+            tp.end()
             return
 
         assert len(samples) % self.args.n_samples_per_prompt == 0
@@ -178,10 +191,16 @@ class Buffer:
             group = samples[i : i + self.args.n_samples_per_prompt]
             self.buffer.append(group)
 
+        tp.end()
+
     async def generate(self, rollout_id, evaluation=False):
+        tp = TracePoint(f"task-{self.args.task_id}: buffer generate", "1")
+        tp.begin()
+
         self.rollout_id = rollout_id
         if self.args.debug_train_only and evaluation:
             # if debug train only, we don't generate evaluation data
+            tp.end()
             return
 
         if not evaluation and self.args.load_debug_rollout_data:
@@ -197,6 +216,7 @@ class Buffer:
                 data = sum(data, [])
 
         self._set_data(data, evaluation=evaluation)
+        tp.end()
 
     def get_data(self, rollout_id, evaluation=False):
         data_pool = self.train_data_pool if not evaluation else self.eval_data_pool
@@ -264,7 +284,11 @@ class Buffer:
         return len(self.buffer)
 
     def save(self, rollout_id):
+        tp = TracePoint(f"task-{self.args.task_id}: buffer save dataset state", "1")
+        tp.begin()
+
         if not self.args.rollout_global_dataset:
+            tp.end()
             return
 
         state_dict = {
@@ -277,7 +301,11 @@ class Buffer:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         torch.save(state_dict, path)
 
+        tp.end()
+
     def load(self, rollout_id=None):
+        tp = TracePoint(f"task-{self.args.task_id}: data buffer load dataset", "1")
+        tp.begin()
         if not self.args.rollout_global_dataset:
             return
 
@@ -299,3 +327,4 @@ class Buffer:
 
         if self.args.rollout_global_dataset and self.args.rollout_shuffle:
             self.dataset.shuffle(self.epoch_id)
+        tp.end()

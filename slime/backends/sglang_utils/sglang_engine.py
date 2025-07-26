@@ -3,6 +3,8 @@ import dataclasses
 import os
 from typing import TYPE_CHECKING
 
+from tracer import vinit, TracePoint, MemTracePoint
+
 from sglang.srt.server_args import ServerArgs
 from slime.utils.http_utils import get_host_info
 from .http_server_engine import HttpServerEngineAdapter
@@ -23,9 +25,12 @@ def get_base_gpu_id(args, rank):
 
 class SglangEngine:
 
-    def __init__(self, args, rank, dist_init_addr, port, nccl_port):
+    def __init__(self, args, rank, dist_init_addr, port, nccl_port, global_rank, task_id):
         self.args = args
-
+        self.task_id = task_id
+        self.global_rank = global_rank
+        os.environ["GLOBAL_RANK"] = str(global_rank)
+        vinit()
         # remove the CUDA_VISIBLE_DEVICES set by ray and use base_gpu_id
         os.environ.pop("CUDA_VISIBLE_DEVICES", None)
 
@@ -77,26 +82,77 @@ class SglangEngine:
         )
 
     def update_weights_from_distributed(self, names, dtypes, shapes, group_name):
+        tp = TracePoint(f"task-{self.args.task_id}: sglang engine update weights from distributed", "1")
+        tp.begin()
+        MemTracePoint.record("before update weights from distributed")
+        
         self.llm.update_weights_from_distributed(names, dtypes, shapes, group_name)
+        
+        MemTracePoint.record("after update weights from distributed")
+        tp.end()
         return
 
     def update_weights_from_tensor(self, ipc_handles):
+        tp = TracePoint(f"task-{self.args.task_id}: sglang engine update weights from tensor", "1")
+        tp.begin()
+        MemTracePoint.record("before update weights from tensor")
+        
         self.llm.update_weights_from_tensor(ipc_handles)
+        
+        MemTracePoint.record("after update weights from tensor")
+        tp.end()
         return
 
     def reset_prefix_cache(self):
+        tp = TracePoint(f"task-{self.args.task_id}: sglang engine reset prefix cache", "1")
+        tp.begin()
+        MemTracePoint.record("before reset prefix cache")
+        
         self.llm.flush_cache()
+        
+        MemTracePoint.record("after reset prefix cache")
+        tp.end()
 
     def sleep(self, level=1):
+        tp = TracePoint(f"task-{self.args.task_id}: sglang engine sleep", "1")
+        tp.begin()
+        MemTracePoint.record("before flush cache")
+        
         # Adhoc solution to ensure no running requests
         self.llm.flush_cache()
+        MemTracePoint.record("after flush cache")
+        
+        MemTracePoint.record("before release memory")
         self.llm.release_memory_occupation()
+        MemTracePoint.record("after release memory")
+        tp.end()
 
     def wake_up(self):
+        tp = TracePoint(f"task-{self.args.task_id}: sglang engine wake up", "1")
+        tp.begin()
+        MemTracePoint.record("before resume memory")
+        
         self.llm.resume_memory_occupation()
+        
+        MemTracePoint.record("after resume memory")
+        tp.end()
 
     def pause_generation(self):
+        tp = TracePoint(f"task-{self.args.task_id}: sglang engine pause generation", "1")
+        tp.begin()
+        MemTracePoint.record("before pause generation")
+        
         self.llm.pause_generation()
+        
+        MemTracePoint.record("after pause generation")
+        tp.end()
 
     def continue_generation(self):
+        tp = TracePoint(f"task-{self.args.task_id}: sglang engine continue generation", "1")
+        tp.begin()
+        MemTracePoint.record("before continue generation")
+        
         self.llm.continue_generation()
+        
+        MemTracePoint.record("after continue generation")
+        tp.end()

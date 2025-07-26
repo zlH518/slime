@@ -37,6 +37,8 @@ class TrainRayActor(RayActor):
         tp.end()
 
     def init(self, args, role, with_ref=False):
+        tp = TracePoint(f"task-{self.args.task_id}: train actor init", "1")
+        tp.begin()
         self.args = args
         self.role = role
         self.with_ref = with_ref
@@ -55,6 +57,7 @@ class TrainRayActor(RayActor):
         # set current device
         args.local_rank = args.rank % torch.cuda.device_count()
         torch.cuda.set_device(f"cuda:{args.local_rank}")
+        tp.end()
 
     @abc.abstractmethod
     def sleep(self, tags):
