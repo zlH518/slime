@@ -225,10 +225,10 @@ def create_rollout_engines(args, pg):
 
 class RolloutGroup:
     def __init__(self, args, pg):
+        self.args = args
         vinit()
         tp = TracePoint(f"task-{self.args.task_id}: init rollout group", "1")
         tp.begin()
-        self.args = args
         self.start_router()
         self.data_buffer = Buffer.options(
             num_cpus=1,
