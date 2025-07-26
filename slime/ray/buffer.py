@@ -29,10 +29,10 @@ def pop_first(args, rollout_id, buffer: list[list[Sample]], num_samples: int) ->
 @ray.remote
 class Buffer:
     def __init__(self, args):
+        self.args = args
         vinit()
         tp = TracePoint(f"task-{self.args.task_id}", "1")
         tp.begin()
-        self.args = args
 
         # a list of sample group.
         # each group has n_samples_per_prompt samples, all of them has the same prompt.
