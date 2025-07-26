@@ -3,6 +3,7 @@ import math
 import numpy as np
 import ray
 import torch
+import asyncio
 import torch.distributed as dist
 import torch.nn.functional as F
 from megatron.core import mpu
@@ -351,14 +352,14 @@ def log_passrate(rollout_id, args, rollout_data):
             )
 
 
-def log_eval_data(rollout_id, args, data_buffer):
+async def log_eval_data(rollout_id, args, data_buffer):
     if (
         mpu.get_tensor_model_parallel_rank() == 0
         and mpu.is_pipeline_last_stage()
         and mpu.get_data_parallel_rank(with_context_parallel=True) == 0
     ):
         rank = dist.get_rank()
-        data = ray.get(data_buffer.get_data.remote(rollout_id, evaluation=True))
+        data = await data_buffer.get_data.remote(rollout_id, evaluation=True)
 
         log_dict = {}
         for key in data.keys():

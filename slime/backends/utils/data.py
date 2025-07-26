@@ -2,6 +2,7 @@ from typing import Optional
 
 import ray
 import torch
+import asyncio
 import torch.distributed as dist
 
 from slime.utils.seqlen_balancing import get_seqlen_balanced_partitions
@@ -67,11 +68,11 @@ def get_minimum_num_micro_batch_size(total_lengths, max_tokens_per_gpu, cp_size)
     return len(batches)
 
 
-def process_rollout_data(rollout_id, args, data_buffer, dp_rank, dp_size, rollout_data):
+await def process_rollout_data(rollout_id, args, data_buffer, dp_rank, dp_size, rollout_data):
     rank = dist.get_rank()
 
     if rank == 0:
-        data = ray.get(data_buffer.get_data.remote(rollout_id))
+        data = await data_buffer.get_data.remote(rollout_id)
         dist.broadcast_object_list([data], src=0)
     else:
         data = [None]

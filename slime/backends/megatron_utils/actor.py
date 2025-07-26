@@ -184,10 +184,10 @@ class MegatronTrainRayActor(TrainRayActor):
             await self.data_buffer.update_wandb_run_id.remote(self.args.wandb_run_id)
         tp.end()
 
-    def get_rollout_data(self, rollout_id, rollout_data):
+    async def get_rollout_data(self, rollout_id, rollout_data):
         # Fetch data through ray on CPU, not sure if this will be performance bottleneck.
         # Both first pp stage and the last pp stage will recieve the data.
-        process_rollout_data(
+        await process_rollout_data(
             rollout_id,
             self.args,
             self.data_buffer,
@@ -222,26 +222,42 @@ class MegatronTrainRayActor(TrainRayActor):
 
     async def train(self, rollout_id, with_data_fetching=True):
         Timer().end("train_wait")
+        prepare_train = TracePoint(f"task-{self.args.task_id}: megatron train actor prepare train", "1")
+        prepare_train.begin()
 
         rollout_data = {}
 
         if self.args.debug_rollout_only:
             # For debug rollout, we just log the data and return.
             if with_data_fetching:
-                self.get_rollout_data(rollout_id, rollout_data)
+                data_fetch_trace = TracePoint(f"task-{self.args.task_id}: megatron train actor data fetch", "1")
+                data_fetch_trace.begin()
+                await self.get_rollout_data(rollout_id, rollout_data)
+                data_fetch_trace.end()
+
             log_rollout_data(rollout_id, self.args, rollout_data)
             log_perf_data(rollout_id, self.args)
+            train_trace.end()
             Timer().start("train_wait")
             return
 
         if self.args.offload:
+            wakeup_trace = TracePoint(f"task-{self.args.task_id}: model wake up", "1")
+            wakeup_trace.begin()
+            MemTracePoint("before wake up model")
             self.wake_up(("model"))
+            MemTracePoint("after wake up model")
+            wakeup_trace.end()
 
         with timer("train"):
             with timer("data_preprocess"):
                 # For async train, we need to separate the data fetching and training.
                 if with_data_fetching:
-                    self.get_rollout_data(rollout_id, rollout_data)
+                    data_fetch_trace = TracePoint(f"task-{self.args.task_id}: megatron train actor data fetch", "1")
+                    data_fetch_trace.begin()
+                    await self.get_rollout_data(rollout_id, rollout_data)
+                    data_fetch_trace.end()
+                    MemTracePoint.record("megatron train actor after data fetch")
 
                 # Create data iterator for log_probs and train.
                 (
@@ -253,7 +269,14 @@ class MegatronTrainRayActor(TrainRayActor):
 
             if self.args.compute_advantages_and_returns:
                 if "ref" in self.weights:
+                    ref_trace = TracePoint(f"task-{self.args.task_id}: megatron train actor ref log prob", "1")
+                    ref_trace.begin()
+                    ref_update = TracePoint(f"task-{self.args.task_id}: megatron train actor update ref in gpu", "1")
+                    ref_update.begin()
+                    MemTracePoint.record("before update ref in gpu")
                     self.update_gpu_params_dict(self.weights["ref"])
+                    MemTracePoint.record("after update ref in gpu")
+                    ref_update.end()
                     self.compute_log_prob(
                         "ref",
                         log_probs_data_iterator,
@@ -261,7 +284,10 @@ class MegatronTrainRayActor(TrainRayActor):
                         store_prefix="ref_",
                         rollout_data=rollout_data,
                     )
+                    ref_trace.end()
 
+                actor_trace = TracePoint(f"task-{self.args.task_id}: megatron train actor actor log prob", "1")
+                actor_trace.begin()
                 self.compute_log_prob(
                     "old_actor" if self.args.keep_old_actor else "actor",
                     log_probs_data_iterator,
@@ -269,21 +295,33 @@ class MegatronTrainRayActor(TrainRayActor):
                     store_prefix="",
                     rollout_data=rollout_data,
                 )
+                actor_trace.end()
                 # when there is old actor, we need to update the model params to actor manually
                 if "old_actor" in self.weights:
+                    MemTracePoint.record("before update old actor in gpu")
                     self.update_gpu_params_dict(self.weights["actor"])
+                    MemTracePoint.record("after update old actor in gpu")
 
                 # Calculate adv and returns. Need to performed before training (instead of on the fly),
                 # because we may need normalize the whole rollout.
                 compute_advantages_and_returns(self.args, rollout_data)
 
             if self.rollout_data_postprocess is not None:
+                postprocess_trace = TracePoint(f"task-{self.args.task_id}: megatron train actor data post process", "1")
+                postprocess_trace.begin()
                 self.rollout_data_postprocess(self.args)
+                postprocess_trace.end()
 
+            log_trace = TracePoint(f"task-{self.args.task_id}: megatron train actor log rollout", "1")
+            log_trace.begin()
             log_rollout_data(rollout_id, self.args, rollout_data)
+            log_trace.end()
 
+            prepare_train.end()
             # Train
             with timer("actor_train"):
+                tp = TracePoint(f"task-{self.args.task_id}: megatron train actor real train", "1")
+                tp.begin()
                 train(
                     rollout_id,
                     self.model,
@@ -292,6 +330,7 @@ class MegatronTrainRayActor(TrainRayActor):
                     train_data_iterator,
                     train_num_microbatches,
                 )
+                tp.end()
 
         log_perf_data(rollout_id, self.args)
         Timer().start("train_wait")
@@ -301,7 +340,7 @@ class MegatronTrainRayActor(TrainRayActor):
             return
 
         # TODO: is logging enough?
-        log_eval_data(rollout_id, self.args, self.data_buffer)
+        await log_eval_data(rollout_id, self.args, self.data_buffer)
 
     async def save_model(self, iteration, with_optimizer=True):
         tp = TracePoint(f"task-{self.args.task_id}: save model", "1")
