@@ -10,6 +10,9 @@ import torch
 import torch.distributed as dist
 from megatron.core import mpu
 from megatron.core.transformer.transformer_layer import get_transformer_layer_offset
+
+from tracer import vinit, TracePoint, MemTracePoint
+
 from slime.utils.types import ParamInfo
 from .initialize import get_gloo_group
 from .megatron_to_hf import convert_to_hf  # noqa: F401
