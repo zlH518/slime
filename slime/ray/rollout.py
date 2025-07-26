@@ -38,8 +38,8 @@ class RolloutRayActor(RayActor):
             dist_init_addr=dist_init_addr,
             port=port,
             nccl_port=nccl_port,
-            task_id = task_id,
-            global_rank = global_rank
+            task_id = self.args.task_id,
+            global_rank = self.global_rank
         )
         MemTracePoint.record("after init infer engine")
 
