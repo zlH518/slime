@@ -12,6 +12,7 @@ from slime.backends.sglang_utils.sglang_engine import SglangEngine
 from slime.ray.buffer import Buffer
 from slime.ray.ray_actor import RayActor
 from slime.utils.http_utils import find_available_port, get_host_info, run_router
+from slime.utils.misc import ActorStatus
 from .utils import Lock
 
 from tracer import vinit, TracePoint, MemTracePoint
@@ -23,6 +24,7 @@ class RolloutRayActor(RayActor):
         self.args = args
         self.rank = rank
         self.global_rank = global_rank
+        self.status = ActorStatus.PENDING
         os.environ["GLOBAL_RANK"] = str(global_rank)
         vinit()
 
@@ -46,7 +48,7 @@ class RolloutRayActor(RayActor):
         if self.args.offload:
             MemTracePoint.record("before offload engine")
             # offload the engine to the CPU
-            self.infer_engine.sleep()
+            self.sleep()
             MemTracePoint.record("after offload engine")
 
         tp.end()
@@ -89,6 +91,7 @@ class RolloutRayActor(RayActor):
         tp.end()
 
     def sleep(self, level=1):
+        assert self.status == ActorStatus.ONLOAD or self.status == ActorStatus.PENDING
         tp = TracePoint(f"task-{self.args.task_id}: rollout actor sleep", "1")
         tp.begin()
         MemTracePoint.record("before engine sleep")
@@ -97,8 +100,10 @@ class RolloutRayActor(RayActor):
         
         MemTracePoint.record("after engine sleep")
         tp.end()
+        self.status = ActorStatus.OFFLOAD
 
     def wake_up(self):
+        assert self.status == ActorStatus.OFFLOAD
         tp = TracePoint(f"task-{self.args.task_id}: rollout actor wake up", "1")
         tp.begin()
         MemTracePoint.record("before engine wake up")
@@ -106,7 +111,9 @@ class RolloutRayActor(RayActor):
         self.infer_engine.wake_up()
         
         MemTracePoint.record("after engine wake up")
+        self.status = ActorStatus.ONLOAD
         tp.end()
+
 
     def pause_generation(self):
         tp = TracePoint(f"task-{self.args.task_id}: rollout pause generation", "1")

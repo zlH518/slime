@@ -1,5 +1,5 @@
 import importlib
-
+from enum import Enum
 
 def load_function(path):
     """
@@ -24,3 +24,9 @@ class SingletonMeta(type):
             instance = super().__call__(*args, **kwargs)
             cls._instances[cls] = instance
         return cls._instances[cls]
+
+
+class ActorStatus(Enum):
+    ONLOAD = "onload"
+    OFFLOAD = "offload"
+    PENDING = "pending"

@@ -145,6 +145,7 @@ class MegatronTrainRayActor(TrainRayActor):
 
     def sleep(self, tags):
         with timer("sleep"):
+            assert self.status == ActorStatus.ONLOAD or self.status == ActorStatus.PENDING
             assert self.args.offload
             assert "model" in tags
             if isinstance(tags, str):
@@ -159,9 +160,11 @@ class MegatronTrainRayActor(TrainRayActor):
 
             clear_memory()
             print_memory(f"after offload model")
+            self.status = ActorStatus.OFFLOAD
 
     def wake_up(self, tags):
         with timer("wake up"):
+            assert self.status == ActorStatus.OFFLOAD
             assert self.args.offload
             clear_memory()
             print_memory("before wake_up model")
@@ -174,6 +177,7 @@ class MegatronTrainRayActor(TrainRayActor):
 
             clear_memory()
             print_memory("after wake_up model")
+            self.status = ActorStatus.ONLOAD
 
     async def set_data_buffer(self, data_buffer):
         tp = TracePoint(f"task-{self.args.task_id}: megatron train actor set data buffer", "1")
@@ -221,6 +225,7 @@ class MegatronTrainRayActor(TrainRayActor):
             )
 
     async def train(self, rollout_id, with_data_fetching=True):
+        assert self.status == ActorStatus.ONLOAD
         Timer().end("train_wait")
         prepare_train = TracePoint(f"task-{self.args.task_id}: megatron train actor prepare train", "1")
         prepare_train.begin()
@@ -240,14 +245,6 @@ class MegatronTrainRayActor(TrainRayActor):
             train_trace.end()
             Timer().start("train_wait")
             return
-
-        if self.args.offload:
-            wakeup_trace = TracePoint(f"task-{self.args.task_id}: model wake up", "1")
-            wakeup_trace.begin()
-            MemTracePoint.record("before wake up model")
-            self.wake_up("model")
-            MemTracePoint.record("after wake up model")
-            wakeup_trace.end()
 
         with timer("train"):
             with timer("data_preprocess"):
