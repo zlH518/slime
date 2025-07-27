@@ -226,7 +226,8 @@ class MegatronTrainRayActor(TrainRayActor):
             )
 
     async def train(self, rollout_id, with_data_fetching=True):
-        assert self.status == ActorStatus.ONLOAD
+        if self.args.offload:
+            assert self.status == ActorStatus.ONLOAD
         Timer().end("train_wait")
         prepare_train = TracePoint(f"task-{self.args.task_id}: megatron train actor prepare train", "1")
         prepare_train.begin()

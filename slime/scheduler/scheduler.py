@@ -3,6 +3,7 @@ import asyncio
 
 from .task import Task
 from tracer import vinit, TracePoint
+from slime.utils.timer import Timer, timer
 
 class Scheduler:
     """
@@ -42,9 +43,15 @@ class Scheduler:
         await asyncio.gather(*[self.train(task_id) for task_id in range(self.tasks_num)])
 
         print("All concurrent training tasks finished.")
+        print("6"*200)
+        for task_id in range(self.tasks_num):
+            print(f"task-{task_id} end to end time: ",end="")
+            print(Timer().log_dict()[f"task-{task_id}"]) 
+        print("6"*200)
 
 
     async def train(self, task_id):
+        Timer().start(f"task-{task_id}")
         args = self.tasks[task_id].args
         for rollout_id in range(args.start_rollout_id, args.num_rollout):
             async with self.rollout_lock:
@@ -116,3 +123,4 @@ class Scheduler:
                     tp.begin()
                     await asyncio.gather(*(self.tasks[task_id].rollout_generator.async_offload()))
                     tp.end()
+        Timer().end(f"task-{task_id}")
