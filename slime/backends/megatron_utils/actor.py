@@ -16,6 +16,7 @@ from tracer import vinit, TracePoint, MemTracePoint
 from slime.ray.ppo_actor import TrainRayActor
 from slime.utils.memory_utils import clear_memory, print_memory
 from slime.utils.timer import Timer, timer
+from slime.utils.misc import ActorStatus
 
 from ..utils.data import process_rollout_data
 from .checkpoint import load_checkpoint
