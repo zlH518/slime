@@ -16,7 +16,7 @@ class Task:
         assert Task._task_id <= self.args.tasks_num
         vinit()
         tp = TracePoint(f"task-{self.task_id}: __init__ task", "1")
-
+        tp.begin()
         self.pgs = args.pgs
         self.tasks_num = args.tasks_num
 

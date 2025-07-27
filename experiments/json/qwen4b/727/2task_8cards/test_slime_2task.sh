@@ -11,7 +11,6 @@ sleep 3
 
 # pip install --no-build-isolation --no-deps -e /volume/pt-train/users/mingjie/hzl_code/code/slime
 # pip install --no-build-isolation --no-deps -e /volume/pt-train/users/mingjie/hzl_code/code/slime/tools/Tracer
-# pip install --no-build-isolation --no-deps -e /volume/pt-train/users/mingjie/hzl_code/code/slime/tools/torch_memory_saver
 
 source /volume/pt-train/users/mingjie/hzl_code/code/slime/scripts/models/qwen3-4B.sh
 
@@ -23,28 +22,25 @@ CKPT_ARGS=(
    --save /volume/pt-train/users/mingjie/hzl_code/code/slime/experiments/slime_qwen3_4b_2task
    --save-interval 20
 )
-
 ROLLOUT_ARGS=(
    --prompt-data /volume/pt-train/users/mingjie/hzl_code/data/dapo-math-17k/dapo-math-17k.jsonl
    --input-key prompt
    --label-key label
    --apply-chat-template
    --rollout-shuffle
-
    --rm-type deepscaler
-
-   --num-rollout 2
-   --rollout-batch-size 2
-   --n-samples-per-prompt 2
+   --num-rollout 4
+   --rollout-batch-size 32
+   --n-samples-per-prompt 8
    --rollout-max-response-len 8192
    --rollout-temperature 0.8
 
-   --global-batch-size 4
+   --global-batch-size 256
    --balance-data
 )
 
 EVAL_ARGS=(
-#    --eval-interval 10000
+   --eval-interval 20
    --eval-prompt-data aime /volume/pt-train/users/mingjie/hzl_code/data/amie-2024/aime-2024.jsonl
    --n-samples-per-eval-prompt 16
    --eval-max-response-len 16384
@@ -65,7 +61,7 @@ PERF_ARGS=(
 
    # --micro-batch-size 1
    --use-dynamic-batch-size
-   --max-tokens-per-gpu 4096
+   --max-tokens-per-gpu 9216
 )
 
 GRPO_ARGS=(
@@ -89,14 +85,13 @@ OPTIMIZER_ARGS=(
 )
 
 WANDB_ARGS=(
-   #--use-wandb
+   # --use-wandb
    # --wandb-project slime-dev
    # --wandb-group qwen3-4B-test
    # --wandb-key ${WANDB_KEY}
 )
 
 SGLANG_ARGS=(
-   --rollout-num-gpus-per-engine 1
    --sglang-mem-fraction-static 0.7
 )
 
@@ -114,10 +109,7 @@ MISC_ARGS=(
 # launch the master node of ray in container
 export MASTER_ADDR=${MASTER_ADDR:-"127.0.0.1"}
 export MASTER_PORT=${MASTER_PORT:-"12345"}
-ray metrics launch-prometheus
-
-
-ray start --head --node-ip-address "127.0.0.1" --num-gpus 4 --disable-usage-stats
+ray start --head --node-ip-address "127.0.0.1" --num-gpus 8 --disable-usage-stats
 
 ray job submit --address="http://127.0.0.1:8265" \
    --working-dir "/volume/pt-train/users/mingjie/hzl_code/code/slime" \
@@ -129,10 +121,9 @@ ray job submit --address="http://127.0.0.1:8265" \
    }' \
    -- python3 train_multi_tasks.py \
    --actor-num-nodes 1 \
-   --actor-num-gpus-per-node 2 \
-   --rollout-num-gpus 2 \
+   --actor-num-gpus-per-node 4 \
+   --rollout-num-gpus 4 \
    --rollout-num-gpus-per-engine 1 \
-   --offload \
    ${MODEL_ARGS[@]} \
    ${CKPT_ARGS[@]} \
    ${ROLLOUT_ARGS[@]} \
