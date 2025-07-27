@@ -65,8 +65,8 @@ class Task:
 
         await asyncio.gather(*(self.actor_model.async_update_weights()))
 
-        # if self.args.offload:
-        #     await asyncio.gather(*(self.rollout_generator.async_offload()))
+        if self.args.offload:
+            await asyncio.gather(*(self.rollout_generator.async_offload()))
 
         self.start_rollout_ids=start_rollout_ids
         tp.end()

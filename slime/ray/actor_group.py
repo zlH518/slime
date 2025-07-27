@@ -136,3 +136,6 @@ class RayTrainGroup:
 
     def async_offload(self):
         return [actor.sleep.remote(("model")) for actor in self._actor_handlers]
+
+    def async_onload(self):
+        return [actor.wake_up.remote(("model")) for actor in self._actor_handlers]
