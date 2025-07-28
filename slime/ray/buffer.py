@@ -307,14 +307,17 @@ class Buffer:
         tp = TracePoint(f"task-{self.args.task_id}: data buffer load dataset", "1")
         tp.begin()
         if not self.args.rollout_global_dataset:
+            tp.end()
             return
 
         if self.args.load is None:
+            tp.end()
             return
 
         path = os.path.join(self.args.load, f"rollout/global_dataset_state_dict_{rollout_id}.pt")
         if not os.path.exists(path):
             print(f"Checkpoint {path} does not exist.")
+            tp.end()
             return
 
         print(f"load metadata from {path}")
