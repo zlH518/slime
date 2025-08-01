@@ -1,0 +1,114 @@
+diff --git a/python/sglang/srt/layers/quantization/fp8.py b/python/sglang/srt/layers/quantization/fp8.py
+index 4d886de..99f9df6 100644
+--- a/python/sglang/srt/layers/quantization/fp8.py
++++ b/python/sglang/srt/layers/quantization/fp8.py
+@@ -349,10 +349,10 @@ class Fp8LinearMethod(LinearMethodBase):
+                 return
+             else:
+                 weight, weight_scale = layer.weight.data, layer.weight_scale_inv.data
+-            layer.weight = torch.nn.Parameter(weight, requires_grad=False)
+-            layer.weight_scale_inv = torch.nn.Parameter(
+-                weight_scale, requires_grad=False
+-            )
++            #layer.weight = torch.nn.Parameter(weight, requires_grad=False)
++            #layer.weight_scale_inv = torch.nn.Parameter(
++            #    weight_scale, requires_grad=False
++            #)
+             return
+ 
+         layer.weight = torch.nn.Parameter(layer.weight.data, requires_grad=False)
+diff --git a/python/sglang/srt/managers/scheduler.py b/python/sglang/srt/managers/scheduler.py
+index afb4b87..20917d8 100644
+--- a/python/sglang/srt/managers/scheduler.py
++++ b/python/sglang/srt/managers/scheduler.py
+@@ -2841,17 +2841,82 @@ def is_health_check_generate_req(recv_req):
+ 
+ 
+ def _export_static_state(model):
+-    return dict(
+-        buffers=[
+-            (name, buffer.detach().clone()) for name, buffer in model.named_buffers()
+-        ]
+-    )
++    buffers = []
++    parameters = []
++    
++    # Export buffers
++    for name, buffer in model.named_buffers():
++        try:
++            # Check if buffer is on CUDA and accessible
++            if buffer.device.type == 'cuda':
++                # Ensure CUDA operations are synchronized before copying
++                torch.cuda.synchronize(buffer.device)
++                # Move to CPU first to avoid CUDA errors during memory release
++                cpu_buffer = buffer.detach().cpu().clone()
++                buffers.append((name, cpu_buffer))
++            else:
++                # Buffer is already on CPU
++                buffers.append((name, buffer.detach().clone()))
++        except RuntimeError:
++            # Skip buffers that cause errors - this prevents CUDA illegal memory access
++            continue
++    
++    # Export parameters
++    for name, param in model.named_parameters():
++        try:
++            # Check if parameter is on CUDA and accessible
++            if param.device.type == 'cuda':
++                # Ensure CUDA operations are synchronized before copying
++                torch.cuda.synchronize(param.device)
++                # Move to CPU first to avoid CUDA errors during memory release
++                cpu_param = param.detach().cpu().clone()
++                parameters.append((name, cpu_param))
++            else:
++                # Parameter is already on CPU
++                parameters.append((name, param.detach().clone()))
++        except RuntimeError:
++            # Skip parameters that cause errors - this prevents CUDA illegal memory access
++            continue
++    
++    return dict(buffers=buffers, parameters=parameters)
+ 
+ 
+ def _import_static_state(model, static_params):
+-    self_named_buffers = dict(model.named_buffers())
+-    for name, tensor in static_params["buffers"]:
+-        self_named_buffers[name][...] = tensor
++    # Restore buffers
++    if "buffers" in static_params:
++        self_named_buffers = dict(model.named_buffers())
++        for name, tensor in static_params["buffers"]:
++            if name in self_named_buffers:
++                try:
++                    target_buffer = self_named_buffers[name]
++                    # Move tensor to the same device as target buffer
++                    if target_buffer.device != tensor.device:
++                        tensor = tensor.to(target_buffer.device)
++                    target_buffer[...] = tensor
++                    # Ensure CUDA operations are synchronized
++                    if target_buffer.device.type == 'cuda':
++                        torch.cuda.synchronize(target_buffer.device)
++                except RuntimeError:
++                    # Skip buffers that cause errors during restoration
++                    continue
++    
++    # Restore parameters
++    if "parameters" in static_params:
++        self_named_parameters = dict(model.named_parameters())
++        for name, tensor in static_params["parameters"]:
++            if name in self_named_parameters:
++                try:
++                    target_param = self_named_parameters[name]
++                    # Move tensor to the same device as target parameter
++                    if target_param.device != tensor.device:
++                        tensor = tensor.to(target_param.device)
++                    target_param.data[...] = tensor
++                    # Ensure CUDA operations are synchronized
++                    if target_param.device.type == 'cuda':
++                        torch.cuda.synchronize(target_param.device)
++                except RuntimeError:
++                    # Skip parameters that cause errors during restoration
++                    continue
+ 
+ 
+ def run_scheduler_process(

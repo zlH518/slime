@@ -130,9 +130,7 @@ class RayTrainGroup:
 
     def async_update_weights(self):
         """Broadcast weights from rank 0 to all other ranks."""
-        result = [actor.update_weights.remote() for actor in self._actor_handlers]
-        print("async_update_weights result types:", [type(r) for r in result])
-        return result
+        return [actor.update_weights.remote() for actor in self._actor_handlers]
 
     def async_offload(self):
         return [actor.sleep.remote(("model")) for actor in self._actor_handlers]

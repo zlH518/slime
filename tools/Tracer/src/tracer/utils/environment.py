@@ -1,5 +1,7 @@
+import os
 
-_ROOT_LOGGER_PATH = "/volume/pt-train/users/mingjie/hzl_code/code/slime/experiments/log/"
+
+_ROOT_LOGGER_PATH = os.getenv("LOG_DIR")
 
 def torch_available():
     """

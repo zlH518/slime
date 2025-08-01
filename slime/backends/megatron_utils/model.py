@@ -82,7 +82,7 @@ def setup_model_and_optimizer(
     model = get_model(model_provider_func, model_type, wrap_with_ddp=False)
 
     allocator = CuMemAllocator.get_instance() if args.colocate else None
-    with allocator.use_memory_pool(tag="model") if args.colocate else nullcontext():
+    with allocator.use_memory_pool(tag="model"+str(args.task_id)) if args.colocate else nullcontext():
         config = get_model_config(model[0])
 
         kwargs = {}

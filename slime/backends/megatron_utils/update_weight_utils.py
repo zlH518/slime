@@ -376,6 +376,7 @@ class UpdateWeightFromDistributed:
             await asyncio.gather(*refs)
 
     async def update_weights(self):
+        breakpoint()
         if dist.get_rank() == 0:
             await asyncio.gather(*[engine.pause_generation.remote() for engine in self.rollout_engines])
             await asyncio.gather(*[engine.reset_prefix_cache.remote() for engine in self.rollout_engines])

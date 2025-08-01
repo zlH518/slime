@@ -197,3 +197,7 @@ local/
 # ckpt
 /volume/pt-train/users/mingjie/hzl_code/code/slime/experiments/slime_qwen3_4b_1task
 /volume/pt-train/users/mingjie/hzl_code/code/slime/experiments/slime_qwen3_4b_1task/*
+
+*/log
+*/json
+*/wandb
