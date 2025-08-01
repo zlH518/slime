@@ -181,7 +181,7 @@ local/
 *.out
 *.pkl
 
-tools/torch_memory_saver
+/volume/pt-train/users/mingjie/hzl_code/code/slime/tools/torch_memory_saver
 
 # wandb
 /volume/pt-train/users/mingjie/hzl_code/code/slime/test/wandb
