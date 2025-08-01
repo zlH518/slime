@@ -156,6 +156,9 @@ class MegatronTrainRayActor(TrainRayActor):
 
     def sleep(self, tags):
         with timer("sleep"):
+            tp = TracePoint(f"task-{self.args.task_id}: actor model real sleep", "1")
+            tp.begin()
+            MemTracePoint.record("before offload actor model")
             assert self.status == ActorStatus.ONLOAD or self.status == ActorStatus.PENDING
             assert self.args.offload
             tags = tags+str(self.args.task_id)
@@ -173,9 +176,14 @@ class MegatronTrainRayActor(TrainRayActor):
             clear_memory()
             print_memory(f"after offload actor model")
             self.status = ActorStatus.OFFLOAD
+            MemTracePoint.record("after onload actor model")
+            tp.end()
 
     def wake_up(self, tags):
         with timer("wake up"):
+            tp = TracePoint(f"task-{self.args.task_id}: actor model real wake up", "1")
+            tp.begin()
+            MemTracePoint.record("before onload actor model")
             assert self.status == ActorStatus.OFFLOAD
             assert self.args.offload
             tags = tags+str(self.args.task_id) 
@@ -190,7 +198,9 @@ class MegatronTrainRayActor(TrainRayActor):
 
             clear_memory()
             print_memory("after wake_up actor model")
+            MemTracePoint.record("after offload actor model")
             self.status = ActorStatus.ONLOAD
+            tp.end()
 
     async def set_data_buffer(self, data_buffer):
         tp = TracePoint(f"task-{self.args.task_id}: megatron train actor set data buffer", "1")
@@ -237,8 +247,8 @@ class MegatronTrainRayActor(TrainRayActor):
     async def train(self, rollout_id, with_data_fetching=True):
         if self.args.offload:
             assert self.status == ActorStatus.ONLOAD
-        if self._task_id == 1:
-            breakpoint()
+        # if self._task_id == 1:
+        #     breakpoint()
         Timer().end("train_wait")
         prepare_train = TracePoint(f"task-{self.args.task_id}: megatron train actor prepare train", "1")
         prepare_train.begin()

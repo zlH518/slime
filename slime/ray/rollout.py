@@ -116,6 +116,7 @@ class RolloutRayActor(RayActor):
         tp = TracePoint(f"task-{self.args.task_id}: rollout actor wake up", "1")
         tp.begin()
         MemTracePoint.record("before engine wake up")
+        # breakpoint()
         
         self.infer_engine.wake_up()
         

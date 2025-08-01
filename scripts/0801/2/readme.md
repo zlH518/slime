@@ -1,0 +1,1 @@
+看到1中的主进程上面没有train的标志，但是在对应的actor中是有的，因此修改了scheduler中的log顺序，重新trace出来看看

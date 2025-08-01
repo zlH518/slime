@@ -1,0 +1,9 @@
+修改了2中的trace的问题，看到现在是可以正常的trace和运行了，接下来首先解决一下乱码的问题，debug查看一下
+这里可以确定乱码的问题出现在rollout model offload下去再onload上来就会出现乱码的问题，把这部分注释掉就没有问题了
+另外actor model offload下去mem确实减少了2G, 对于tp2来说，确实是对的
+
+4.测试一个qwen2.5 7B的model，参照example脚本中的配置看一下完整的运行时间，看4个step就可以了
+这部分测试出来，wandb中只有1个点，这明显不对劲
+
+6.zk修改完了sglang的onload和offload逻辑，测试一下，现在不会乱码
+测试完了，发现actor model真正的offload onload前后没有去打点统计，导致timeline图上面缺了点

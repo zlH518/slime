@@ -1,0 +1,3 @@
+修改了2中的trace的问题，看到现在是可以正常的trace和运行了，接下来首先解决一下乱码的问题，debug查看一下
+这里可以确定乱码的问题出现在rollout model offload下去再onload上来就会出现乱码的问题，把这部分注释掉就没有问题了
+另外actor model offload下去mem确实减少了2G, 对于tp2来说，确实是对的

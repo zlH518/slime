@@ -63,7 +63,6 @@ class Task:
 
         if self.args.offload:
             await asyncio.gather(*(self.rollout_generator.async_onload()))
-            # await asyncio.gather(*(self.rollout_generator.async_get_weights_by_name("layers.0.self_attn.q_proj.weight")))
 
         await asyncio.gather(*(self.actor_model.async_update_weights()))
 
