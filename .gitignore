@@ -181,12 +181,19 @@ local/
 *.out
 *.pkl
 
-tools/torch_memory_saver
+/volume/pt-train/users/mingjie/hzl_code/code/slime/tools/torch_memory_saver
 
 # wandb
+/volume/pt-train/users/mingjie/hzl_code/code/slime/test/wandb
+/volume/pt-train/users/mingjie/hzl_code/code/slime/test/wandb/*
+
 /volume/pt-train/users/mingjie/hzl_code/code/slime/test/wandb
 /volume/pt-train/users/mingjie/hzl_code/code/slime/test/wandb/*
 
 # json
 /volume/pt-train/users/mingjie/hzl_code/code/slime/experiments/json
 /volume/pt-train/users/mingjie/hzl_code/code/slime/experiments/json/*
+
+# ckpt
+/volume/pt-train/users/mingjie/hzl_code/code/slime/experiments/slime_qwen3_4b_1task
+/volume/pt-train/users/mingjie/hzl_code/code/slime/experiments/slime_qwen3_4b_1task/*
