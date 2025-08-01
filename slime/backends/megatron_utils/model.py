@@ -373,7 +373,7 @@ def should_disable_forward_pre_hook(args):
     return not args.use_custom_fsdp and args.use_distributed_optimizer and args.overlap_param_gather
 
 
-def train(rollout_id, model, optimizer, opt_param_scheduler, data_iterator, num_microbatches):
+def train(rollout_id, wandb_run_id, model, optimizer, opt_param_scheduler, data_iterator, num_microbatches):
     """Training function: run train_step desired number of times."""
     args = get_args()
 
@@ -429,6 +429,7 @@ def train(rollout_id, model, optimizer, opt_param_scheduler, data_iterator, num_
     for step_id in range(num_steps_per_rollout):
 
         # Run training step.
+        # breakpoint()
         loss_dict, grad_norm = train_one_step(
             args,
             rollout_id,
@@ -466,6 +467,7 @@ def train(rollout_id, model, optimizer, opt_param_scheduler, data_iterator, num_
 
             if args.use_wandb:
                 log_dict["train/step"] = accumulated_step_id
+                # breakpoint()
                 wandb.log(log_dict)
 
             print(f"step {accumulated_step_id}: {log_dict}")
@@ -491,6 +493,19 @@ def save(iteration, model, optimizer, opt_param_scheduler):
     if should_disable_forward_pre_hook(args):
         enable_forward_pre_hook(model)
 
+def monkey_patch_get_weights_by_name(model):
+    def get_weights_by_name(self, name):
+        state_dict = self.state_dict()
+        if name in state_dict:
+            return state_dict[name]
+        raise KeyError(f"{name} not found in model.")
+    import types
+    if isinstance(model, list):
+        for chunk in model:
+            chunk.get_weights_by_name = types.MethodType(get_weights_by_name, chunk)
+    else:
+        model.get_weights_by_name = types.MethodType(get_weights_by_name, model)
+
 
 def initialize_model_and_optimizer(args):
     model_provider, model_type = get_model_provider_and_type()
@@ -500,6 +515,7 @@ def initialize_model_and_optimizer(args):
         model_provider,
         model_type,
     )
+    # monkey_patch_get_weights_by_name(model)
     clear_memory()
     iteration, _ = load_checkpoint(
         model,

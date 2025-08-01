@@ -1,5 +1,6 @@
 import ray
 import torch
+import wandb
 import asyncio
 import torch.distributed as dist
 
@@ -17,11 +18,12 @@ from slime.ray.ppo_actor import TrainRayActor
 from slime.utils.memory_utils import clear_memory, print_memory
 from slime.utils.timer import Timer, timer
 from slime.utils.misc import ActorStatus
+from slime.utils.wandb_utils import init_wandb_common
 
 from ..utils.data import process_rollout_data
 from .checkpoint import load_checkpoint
 from .data import get_data_iterator, log_eval_data, log_perf_data, log_rollout_data
-from .initialize import get_gloo_group, init
+from .initialize import get_gloo_group, init, is_megatron_main_rank
 from .loss import compute_advantages_and_returns
 from .model import forward_only, initialize_model_and_optimizer, save, train
 from .update_weight_utils import (
@@ -36,9 +38,17 @@ class MegatronTrainRayActor(TrainRayActor):
         tp = TracePoint(f"task-{args.task_id}: Megatron train actor init", "1")
         tp.begin()
         super().init(args, role, with_ref)
+        
+        if self._rank == 0:
+            wandb.init(
+                project=args.wandb_project+str(args.task_id),
+                group=f"{args.wandb_group}-{args.task_id}",
+                name=f"{args.task_id}-MegatronTrainRayActor-{self._rank}",
+                config={"rank": self._rank},
+            )
+            init_wandb_common()
 
-        wandb_run_id = init(args)
-        self.args.wandb_run_id = wandb_run_id
+        init(args)
 
         # read config and tokenizer serialized to prevent concurrent writing bug.
         for i in range(dist.get_world_size()):
@@ -148,27 +158,29 @@ class MegatronTrainRayActor(TrainRayActor):
         with timer("sleep"):
             assert self.status == ActorStatus.ONLOAD or self.status == ActorStatus.PENDING
             assert self.args.offload
-            assert "model" in tags
+            tags = tags+str(self.args.task_id)
+            assert "model"+str(self.args.task_id) in tags
             if isinstance(tags, str):
                 tags = (tags,)
 
             clear_memory()
-            print_memory(f"before offload model")
+            print_memory(f"before offload actor model")
             self.update_cpu_params_dict(self.weights["actor"])
 
             allocator = CuMemAllocator.get_instance()
             allocator.sleep(offload_tags=tags)
 
             clear_memory()
-            print_memory(f"after offload model")
+            print_memory(f"after offload actor model")
             self.status = ActorStatus.OFFLOAD
 
     def wake_up(self, tags):
         with timer("wake up"):
             assert self.status == ActorStatus.OFFLOAD
             assert self.args.offload
+            tags = tags+str(self.args.task_id) 
             clear_memory()
-            print_memory("before wake_up model")
+            print_memory("before wake_up actor model")
 
             if isinstance(tags, str):
                 tags = (tags,)
@@ -177,16 +189,13 @@ class MegatronTrainRayActor(TrainRayActor):
             allocator.wake_up(tags)
 
             clear_memory()
-            print_memory("after wake_up model")
+            print_memory("after wake_up actor model")
             self.status = ActorStatus.ONLOAD
 
     async def set_data_buffer(self, data_buffer):
         tp = TracePoint(f"task-{self.args.task_id}: megatron train actor set data buffer", "1")
         tp.begin()
         self.data_buffer = data_buffer
-        if getattr(self.args, "use_wandb", False) and getattr(self.args, "wandb_run_id", None):
-            print(f"Updating buffer's wandb run_id to: {self.args.wandb_run_id}")
-            await self.data_buffer.update_wandb_run_id.remote(self.args.wandb_run_id)
         tp.end()
 
     async def get_rollout_data(self, rollout_id, rollout_data):
@@ -228,6 +237,8 @@ class MegatronTrainRayActor(TrainRayActor):
     async def train(self, rollout_id, with_data_fetching=True):
         if self.args.offload:
             assert self.status == ActorStatus.ONLOAD
+        if self._task_id == 1:
+            breakpoint()
         Timer().end("train_wait")
         prepare_train = TracePoint(f"task-{self.args.task_id}: megatron train actor prepare train", "1")
         prepare_train.begin()
@@ -323,6 +334,7 @@ class MegatronTrainRayActor(TrainRayActor):
                 tp.begin()
                 train(
                     rollout_id,
+                    self.args.wandb_run_id,
                     self.model,
                     self.optimizer,
                     self.opt_param_scheduler,

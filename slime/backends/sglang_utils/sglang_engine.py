@@ -156,3 +156,6 @@ class SglangEngine:
         
         MemTracePoint.record("after continue generation")
         tp.end()
+
+    def get_weights_by_name(self, name):
+        print(self.llm.get_weights_by_name(name))

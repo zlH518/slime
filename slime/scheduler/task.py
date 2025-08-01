@@ -1,7 +1,7 @@
 import ray
 import asyncio
 from ray.util.placement_group import placement_group
-from slime.ray.placement_group import (create_actor_group,create_rollout_group)
+from slime.ray.placement_group import create_actor_group,create_rollout_group
 
 from tracer import vinit, TracePoint, MemTracePoint
 
@@ -32,13 +32,14 @@ class Task:
         rgp.begin()
         self.rollout_generator = create_rollout_group(
                 args=self.args,
-                pg=self.pgs["rollout"],
+                pg=self.pgs["rollout"]
             )
         rgp.end()
         
         tp.end()
 
     async def init(self):
+        # breakpoint()
         tp = TracePoint(f"task-{self.task_id}: init task", "1")
         tp.begin()
         self.num_rollout_per_epoch = None
@@ -62,6 +63,7 @@ class Task:
 
         if self.args.offload:
             await asyncio.gather(*(self.rollout_generator.async_onload()))
+            # await asyncio.gather(*(self.rollout_generator.async_get_weights_by_name("layers.0.self_attn.q_proj.weight")))
 
         await asyncio.gather(*(self.actor_model.async_update_weights()))
 

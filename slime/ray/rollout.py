@@ -3,6 +3,7 @@ import multiprocessing
 import random
 import time
 import math
+import wandb
 import asyncio
 
 import ray
@@ -13,6 +14,7 @@ from slime.ray.buffer import Buffer
 from slime.ray.ray_actor import RayActor
 from slime.utils.http_utils import find_available_port, get_host_info, run_router
 from slime.utils.misc import ActorStatus
+from slime.utils.wandb_utils import init_wandb_common
 from .utils import Lock
 
 from tracer import vinit, TracePoint, MemTracePoint
@@ -27,6 +29,13 @@ class RolloutRayActor(RayActor):
         self.status = ActorStatus.PENDING
         os.environ["GLOBAL_RANK"] = str(global_rank)
         vinit()
+        wandb.init(
+            project=args.wandb_project+str(args.task_id),
+            group=f"{args.wandb_group}-{args.task_id}",
+            name=f"{args.task_id}-RolloutRayActor-{self.rank}",
+            config={"rank": self.rank},
+        )
+        init_wandb_common()
 
     def init(self, dist_init_addr, port, nccl_port):
         tp = TracePoint(f"task-{self.args.task_id}: rollout actor init", "1")
@@ -134,6 +143,9 @@ class RolloutRayActor(RayActor):
         
         MemTracePoint.record("after continue generation")
         tp.end()
+
+    def get_weights_by_name(self, name: str):
+        self.infer_engine.get_weights_by_name(name)
 
 
 def create_rollout_engines(args, pg):
@@ -305,3 +317,6 @@ class RolloutGroup:
 
     def async_onload(self):
         return [engine.wake_up.remote() for engine in self.rollout_engines]
+    
+    def async_get_weights_by_name(self, name: str):
+        return [engine.get_weights_by_name.remote(name) for engine in self.rollout_engines]

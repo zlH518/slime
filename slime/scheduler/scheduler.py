@@ -1,4 +1,5 @@
 import ray
+import wandb
 import asyncio
 
 from .task import Task
@@ -17,9 +18,10 @@ class Scheduler:
 
         self.tasks = []
 
-        self.train_lock= asyncio.Semaphore(args.train_semaphore)
-        self.rollout_lock = asyncio.Semaphore(args.rollout_semaphore)
-        self.update_weight_lock = asyncio.Semaphore(args.update_weight_semaphore)
+        self.train_lock= asyncio.Lock()
+        self.rollout_lock = asyncio.Lock()
+        self.update_weight_lock = asyncio.Lock()
+
 
         self.pgs = args.pgs
 
@@ -34,6 +36,7 @@ class Scheduler:
             tp.begin()
             await task.init()
             tp.end()
+        print("9"*200)
         print("All tasks initialized.")
 
 
@@ -51,6 +54,7 @@ class Scheduler:
 
 
     async def train(self, task_id):
+        # breakpoint()
         Timer().start(f"task-{task_id}")
         args = self.tasks[task_id].args
         for rollout_id in range(args.start_rollout_id, args.num_rollout):
@@ -123,4 +127,5 @@ class Scheduler:
                     tp.begin()
                     await asyncio.gather(*(self.tasks[task_id].rollout_generator.async_offload()))
                     tp.end()
+        wandb.finish()
         Timer().end(f"task-{task_id}")

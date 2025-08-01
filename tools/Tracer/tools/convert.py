@@ -23,7 +23,7 @@ parser.add_argument(
     "--output-file",
     help="Output JSON file path (e.g., trace.json)",
     type=str,
-    default = "/volume/pt-train/users/mingjie/hzl_code/code/slime/experiments/json/727-2task-1"
+    default = "/volume/pt-train/users/mingjie/hzl_code/code/slime/experiments/json/728-1task-1"
 )
 parser.add_argument(
     "--min-time",

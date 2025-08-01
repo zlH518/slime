@@ -20,5 +20,6 @@ def available_memory():
 
 
 def print_memory(msg):
-    if dist.get_rank() == 0:
-        print(f"Memory-Usage {msg}:", available_memory())
+    print("*"*200)
+    print(f"Memory-Usage-rank-{dist.get_rank()}-{msg}:", available_memory())
+    print("*"*200)

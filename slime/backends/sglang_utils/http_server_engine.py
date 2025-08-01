@@ -173,3 +173,15 @@ class HttpServerEngineAdapter:
 
     def continue_generation(self):
         return requests.post(f"http://{self.server_args.host}:{self.server_args.port}/continue_generation", json={})
+
+    def get_weights_by_name(self, name:str):
+        assert isinstance(name, str), "weight name must be string"
+        if self.node_rank != 0:
+            return
+        else:
+            return self._make_request(
+                "get_weights_by_name",
+                {
+                    "name": name
+                }
+            )
