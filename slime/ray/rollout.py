@@ -238,6 +238,7 @@ def create_rollout_engines(args, pg):
     # TODO: don't ray.get here to overlap train actor init with rollout engine init.
     # somehow if we don't sync here, the --debug-rollout-only mode will crash.
     init_handles = [engine.init.remote(**ports) for engine, ports in zip(rollout_engines, addr_and_ports)]
+    print(f"task-{args.task_id}: {addr_and_ports}")
     ray.get(init_handles)
     tp.end()
     return rollout_engines

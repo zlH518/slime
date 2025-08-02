@@ -10,23 +10,24 @@ from megatron.training.global_vars import _build_tokenizer, set_args
 
 import wandb
 
-GLOO_GROUP = None
+# Use a dictionary to store gloo groups for different tasks
+GLOO_GROUPS = {}
 
 
-def _init_gloo_group():
+def _init_gloo_group(task_id=None):
     """Initialize Gloo group for distributed communication."""
-    global GLOO_GROUP
-    if GLOO_GROUP is None:
-        GLOO_GROUP = dist.new_group(backend="gloo")
-    return GLOO_GROUP
+    global GLOO_GROUPS
+    if task_id not in GLOO_GROUPS:
+        GLOO_GROUPS[task_id] = dist.new_group(backend="gloo")
+    return GLOO_GROUPS[task_id]
 
 
-def get_gloo_group():
+def get_gloo_group(task_id=None):
     """Get the Gloo group for distributed communication."""
-    global GLOO_GROUP
-    if GLOO_GROUP is None:
-        raise RuntimeError("Gloo group has not been initialized. Call _init_gloo_group() first.")
-    return GLOO_GROUP
+    global GLOO_GROUPS
+    if task_id not in GLOO_GROUPS:
+        raise RuntimeError(f"Gloo group for task {task_id} has not been initialized. Call _init_gloo_group() first.")
+    return GLOO_GROUPS[task_id]
 
 
 def _set_random_seed(
@@ -75,7 +76,7 @@ def init(args):
     set_args(args)
     # Pytorch distributed.
     _initialize_distributed(args)
-    _init_gloo_group()
+    _init_gloo_group(getattr(args, 'task_id', None))
 
     # https://github.com/NVIDIA/Megatron-LM/issues/1563
     assert np.__version__.startswith("1."), "Megatron does not support numpy 2.x"

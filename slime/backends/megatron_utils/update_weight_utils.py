@@ -241,7 +241,7 @@ class UpdateWeightFromTensor:
         rank = dist.get_rank()
         if rank == 0:
             ray.get([engine.reset_prefix_cache.remote() for engine in self.rollout_engines])
-        dist.barrier(group=get_gloo_group())
+        dist.barrier(group=get_gloo_group(self.args.task_id))
         for param_infos in tqdm(self.param_info_buckets, disable=rank != 0, desc="Update weights"):
             self._update_bucket_weights_from_tensor(param_infos)
 
@@ -346,7 +346,7 @@ class UpdateWeightFromDistributed:
         )
         pp_rank = mpu.get_pipeline_model_parallel_rank()
         if self._is_pp_src_rank:
-            self._group_name = f"slime-pp_{pp_rank}"
+            self._group_name = f"slime-pp_{pp_rank}-task_{self.args.task_id}"
 
         if self._is_pp_src_rank:
             master_address = ray._private.services.get_node_ip_address()
@@ -376,11 +376,11 @@ class UpdateWeightFromDistributed:
             await asyncio.gather(*refs)
 
     async def update_weights(self):
-        breakpoint()
+        # breakpoint()
         if dist.get_rank() == 0:
             await asyncio.gather(*[engine.pause_generation.remote() for engine in self.rollout_engines])
             await asyncio.gather(*[engine.reset_prefix_cache.remote() for engine in self.rollout_engines])
-        dist.barrier(group=get_gloo_group())
+        dist.barrier(group=get_gloo_group(self.args.task_id))
 
         buffer_size = 0
         converted_named_tensors = []
@@ -397,7 +397,7 @@ class UpdateWeightFromDistributed:
         if converted_named_tensors:
             await self._update_bucket_weights_from_distributed(converted_named_tensors, pbar=pbar)
 
-        dist.barrier(group=get_gloo_group())
+        dist.barrier(group=get_gloo_group(self.args.task_id))
 
         buffer_size = 0
         named_tensors = []
@@ -411,10 +411,10 @@ class UpdateWeightFromDistributed:
         if named_tensors:
             self._update_expert_bucket_weights_from_distributed(named_tensors, pbar=pbar)
 
-        dist.barrier(group=get_gloo_group())
+        dist.barrier(group=get_gloo_group(self.args.task_id))
         if dist.get_rank() == 0:
             await asyncio.gather(*[engine.continue_generation.remote() for engine in self.rollout_engines])
-        dist.barrier(group=get_gloo_group())
+        dist.barrier(group=get_gloo_group(self.args.task_id))
 
     async def _update_weight_from_distributed(self, name, param, converted_named_tensors, buffer_size, pbar=None):
         param = all_gather_param(name, param)

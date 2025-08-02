@@ -49,9 +49,12 @@ class TrainRayActor(RayActor):
         local_rank = int(os.environ.get("LOCAL_RANK", 0))
         torch.cuda.set_device(f"cuda:{local_rank}")
 
+        # Use task-specific group name to avoid conflicts between tasks
+        group_name = f"train-task-{self._task_id}"
         dist.init_process_group(
             backend=args.distributed_backend,
             timeout=timedelta(minutes=args.distributed_timeout_minutes),
+            group_name=group_name,
         )
 
         args.rank = dist.get_rank()

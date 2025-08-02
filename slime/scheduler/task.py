@@ -59,15 +59,8 @@ class Task:
         if self.args.rollout_global_dataset:
             await self.rollout_generator.data_buffer.load.remote(self.args.start_rollout_id - 1)
 
+        # breakpoint()
         await self.actor_model.async_init_weight_update_connections(self.rollout_generator)
-
-        if self.args.offload:
-            await asyncio.gather(*(self.rollout_generator.async_onload()))
-
-        await asyncio.gather(*(self.actor_model.async_update_weights()))
-
-        if self.args.offload:
-            await asyncio.gather(*(self.rollout_generator.async_offload()))
 
         self.start_rollout_ids=start_rollout_ids
         tp.end()
