@@ -58,7 +58,7 @@ class MegatronTrainRayActor(TrainRayActor):
                 self.hf_config = AutoConfig.from_pretrained(args.hf_checkpoint, trust_remote_code=True)
                 self.tokenizer = AutoTokenizer.from_pretrained(self.args.hf_checkpoint, trust_remote_code=True)
                 c_tp.end()
-            dist.barrier(group=get_gloo_group())
+            dist.barrier(group=get_gloo_group(self.args.task_id))
 
         if self.args.debug_rollout_only:
             Timer().start("train_wait")
@@ -394,7 +394,7 @@ class MegatronTrainRayActor(TrainRayActor):
         await self.weight_updator.connect_rollout_engines(rollout_engines, rollout_engine_lock)
         MemTracePoint.record("after connect weight updator")
 
-        dist.barrier(group=get_gloo_group())
+        dist.barrier(group=get_gloo_group(self.args.task_id))
         tp.end()
 
     async def update_weights(self):
@@ -414,7 +414,7 @@ class MegatronTrainRayActor(TrainRayActor):
             await self.weight_updator.update_weights()
             MemTracePoint.record("after weight update")
 
-            dist.barrier(group=get_gloo_group())
+            dist.barrier(group=get_gloo_group(self.args.task_id))
             
             MemTracePoint.record("before clear memory")
             clear_memory()

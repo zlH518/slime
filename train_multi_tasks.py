@@ -23,7 +23,7 @@ async def main(args):
 
     # TODO: use yaml to config scheduler
     scheduler_args = SchedulerParams(
-        tasks_num=1,
+        tasks_num=2,
         tasks_args_dir="xxx",
         tasks_args_template=args,
         train_semaphore=1,
