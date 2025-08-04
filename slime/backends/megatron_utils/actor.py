@@ -67,9 +67,11 @@ class MegatronTrainRayActor(TrainRayActor):
         m_op = TracePoint(f"task-{self.args.task_id}: init model and optimizer", "1")
         m_op.begin()
         MemTracePoint.record("before init model and optimizer")
+        torch.cuda.memory._record_memory_history()
         (self.model, self.optimizer, self.opt_param_scheduler, loaded_rollout_id) = initialize_model_and_optimizer(
             args
         )
+        torch.cuda.memory._dump_snapshot("/volume/pt-train/users/mingjie/hzl_code/code/slime/scripts/0804/3/shapshot/init_model.pickle")
         MemTracePoint.record("after init model and optimizer")
         m_op.end()
 
