@@ -30,8 +30,8 @@ CKPT_ARGS=(
    --hf-checkpoint /volume/pt-train/models/Qwen3-4B
    # --hf-checkpoint /root/Qwen3-4B-FP8
    --ref-load /volume/pt-train/models/Qwen3-4B-torch-dict
-   --load /volume/pt-train/users/mingjie/hzl_code/code/slime/experiments/slime_qwen3_4b_1task
-   --save /volume/pt-train/users/mingjie/hzl_code/code/slime/experiments/slime_qwen3_4b_1task
+   --load /volume/pt-train/users/mingjie/hzl_code/code/slime/experiments/slime_qwen3_4b_2task
+   --save /volume/pt-train/users/mingjie/hzl_code/code/slime/experiments/slime_qwen3_4b_2task
    --save-interval 20
 )
 
@@ -43,12 +43,12 @@ ROLLOUT_ARGS=(
    --rollout-shuffle
    --rm-type deepscaler
    --num-rollout 5
-   --rollout-batch-size 16
-   --n-samples-per-prompt 8
-   --rollout-max-response-len 8192
+   --rollout-batch-size 2
+   --n-samples-per-prompt 2
+   --rollout-max-response-len 128
    --rollout-temperature 0.8
 
-   --global-batch-size 128
+   --global-batch-size 4
    --balance-data
 )
 
@@ -60,7 +60,7 @@ EVAL_ARGS=(
 )
 
 PERF_ARGS=(
-   --tensor-model-parallel-size 4
+   --tensor-model-parallel-size 2
    --sequence-parallel
    --pipeline-model-parallel-size 1
    --context-parallel-size 1
@@ -98,7 +98,7 @@ OPTIMIZER_ARGS=(
 
 WANDB_ARGS=(
    --use-wandb
-   --wandb-project 0804-1task-8
+   --wandb-project 0804-2task-12
    --wandb-group qwen3-4B
 )
 
@@ -128,8 +128,8 @@ RUNTIME_ENV_JSON="{
     \"CUDA_DEVICE_MAX_CONNECTIONS\": \"1\",
     \"NCCL_NVLS_ENABLE\": \"${HAS_NVLINK}\",
     \"WANDB_MODE\": \"offline\",
-    \"WANDB_DIR\": \"/volume/pt-train/users/mingjie/hzl_code/code/slime/scripts/0804/8/wandb\",
-    \"LOG_DIR\": \"/volume/pt-train/users/mingjie/hzl_code/code/slime/scripts/0804/8/log\"
+    \"WANDB_DIR\": \"/volume/pt-train/users/mingjie/hzl_code/code/slime/scripts/0804/12/wandb\",
+    \"LOG_DIR\": \"/volume/pt-train/users/mingjie/hzl_code/code/slime/scripts/0804/12/log\"
   }
 }"
 

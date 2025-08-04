@@ -31,13 +31,6 @@ def pop_first(args, rollout_id, buffer: list[list[Sample]], num_samples: int) ->
 class Buffer:
     def __init__(self, args):
         self.args = args
-        wandb.init(
-            project=args.wandb_project+str(args.task_id),
-            group=f"{args.wandb_group}-{args.task_id}",
-            name=f"{args.task_id}-Buffer",
-            config={},
-        )
-        init_wandb_common()
 
         vinit()
         tp = TracePoint(f"task-{self.args.task_id}", "1")
@@ -82,6 +75,47 @@ class Buffer:
         print(f"import {self.args.eval_function_path} as eval_generate_rollout function.")
         tp.end()
 
+    async def update_wandb_run_id(self, run_id):
+        """Update wandb run_id and initialize wandb"""
+        self.args.wandb_run_id = run_id
+        self._init_wandb()  # Now initialize wandb with the correct run_id
+        return True
+
+    def _init_wandb(self):
+        """Initialize wandb for buffer process if use_wandb is enabled"""
+        if not hasattr(self.args, "use_wandb") or not self.args.use_wandb:
+            return
+
+        # Check if wandb is already initialized in this process
+        if wandb.run is not None:
+            print("Wandb already initialized in buffer process")
+            return
+
+        # Use the same wandb configuration as main training process
+        wandb_config = {
+            "entity": getattr(self.args, "wandb_team", None),
+            "project": getattr(self.args, "wandb_project", "slime"),
+            "group": getattr(self.args, "wandb_group", None),
+            "config": self.args.__dict__,
+            "reinit": True,  # Allow reinit in same process
+        }
+
+        # If wandb_run_id is available, join the existing run
+        if hasattr(self.args, "wandb_run_id") and self.args.wandb_run_id:
+            wandb_config["id"] = self.args.wandb_run_id
+            wandb_config["resume"] = "allow"
+            print("=" * 100)
+            print(f"Buffer process joining existing wandb run: {self.args.wandb_run_id}")
+            print("=" * 100)
+        else:
+            # Fallback: create a separate run for buffer process
+            wandb_config["name"] = f"buffer-{os.getpid()}"
+            print("Buffer process creating separate wandb run")
+
+        # Remove None values
+        wandb_config = {k: v for k, v in wandb_config.items() if v is not None}
+
+        wandb.init(**wandb_config, settings=wandb.Settings(mode="offline"))
 
     def get_num_rollout_per_epoch(self):
         assert self.args.rollout_global_dataset

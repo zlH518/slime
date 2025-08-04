@@ -98,7 +98,7 @@ OPTIMIZER_ARGS=(
 
 WANDB_ARGS=(
    --use-wandb
-   --wandb-project 0804-1task-8
+   --wandb-project 0804-1task-10
    --wandb-group qwen3-4B
 )
 
@@ -128,8 +128,8 @@ RUNTIME_ENV_JSON="{
     \"CUDA_DEVICE_MAX_CONNECTIONS\": \"1\",
     \"NCCL_NVLS_ENABLE\": \"${HAS_NVLINK}\",
     \"WANDB_MODE\": \"offline\",
-    \"WANDB_DIR\": \"/volume/pt-train/users/mingjie/hzl_code/code/slime/scripts/0804/8/wandb\",
-    \"LOG_DIR\": \"/volume/pt-train/users/mingjie/hzl_code/code/slime/scripts/0804/8/log\"
+    \"WANDB_DIR\": \"/volume/pt-train/users/mingjie/hzl_code/code/slime/scripts/0804/10/wandb\",
+    \"LOG_DIR\": \"/volume/pt-train/users/mingjie/hzl_code/code/slime/scripts/0804/10/log\"
   }
 }"
 
@@ -140,7 +140,6 @@ ray job submit --address="http://127.0.0.1:8265" \
    --actor-num-gpus-per-node 4 \
    --rollout-num-gpus 4 \
    --rollout-num-gpus-per-engine 1 \
-   --offload \
    ${MODEL_ARGS[@]} \
    ${CKPT_ARGS[@]} \
    ${ROLLOUT_ARGS[@]} \

@@ -24,14 +24,14 @@ else
 fi
 echo "HAS_NVLINK: $HAS_NVLINK (detected $NVLINK_COUNT NVLink references)"
 
-source /volume/pt-train/users/mingjie/hzl_code/code/slime/scripts/models/qwen3-4B.sh
+source /volume/pt-train/users/mingjie/hzl_code/code/slime/scripts/models/qwen2.5-7B.sh
 
 CKPT_ARGS=(
-   --hf-checkpoint /volume/pt-train/models/Qwen3-4B
+   --hf-checkpoint /volume/pt-train/models/Qwen2.5-7B
    # --hf-checkpoint /root/Qwen3-4B-FP8
-   --ref-load /volume/pt-train/models/Qwen3-4B-torch-dict
-   --load /volume/pt-train/users/mingjie/hzl_code/code/slime/experiments/slime_qwen3_4b_1task
-   --save /volume/pt-train/users/mingjie/hzl_code/code/slime/experiments/slime_qwen3_4b_1task
+   --ref-load /volume/pt-train/models/Qwen2.5-7B-torch-dist
+   --load /volume/pt-train/users/mingjie/hzl_code/code/slime/experiments/slime_qwen2.5_7b_1task
+   --save /volume/pt-train/users/mingjie/hzl_code/code/slime/experiments/slime_qwen2.5_7b_1task
    --save-interval 20
 )
 
@@ -60,7 +60,7 @@ EVAL_ARGS=(
 )
 
 PERF_ARGS=(
-   --tensor-model-parallel-size 4
+   --tensor-model-parallel-size 2
    --sequence-parallel
    --pipeline-model-parallel-size 1
    --context-parallel-size 1
@@ -98,8 +98,8 @@ OPTIMIZER_ARGS=(
 
 WANDB_ARGS=(
    --use-wandb
-   --wandb-project 0804-1task-8
-   --wandb-group qwen3-4B
+   --wandb-project 0804-2task-11
+   --wandb-group qwen2.5-7B
 )
 
 SGLANG_ARGS=(
@@ -128,8 +128,8 @@ RUNTIME_ENV_JSON="{
     \"CUDA_DEVICE_MAX_CONNECTIONS\": \"1\",
     \"NCCL_NVLS_ENABLE\": \"${HAS_NVLINK}\",
     \"WANDB_MODE\": \"offline\",
-    \"WANDB_DIR\": \"/volume/pt-train/users/mingjie/hzl_code/code/slime/scripts/0804/8/wandb\",
-    \"LOG_DIR\": \"/volume/pt-train/users/mingjie/hzl_code/code/slime/scripts/0804/8/log\"
+    \"WANDB_DIR\": \"/volume/pt-train/users/mingjie/hzl_code/code/slime/scripts/0804/11/wandb\",
+    \"LOG_DIR\": \"/volume/pt-train/users/mingjie/hzl_code/code/slime/scripts/0804/11/log\"
   }
 }"
 
