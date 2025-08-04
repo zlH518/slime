@@ -65,6 +65,13 @@ class Scheduler:
                     await asyncio.gather(*(self.tasks[task_id].rollout_generator.async_onload()))
                     tp.end()
             
+                if args.offload:
+                    tp = TracePoint(f"task-{task_id}: actor model onload", "1")
+                    tp.begin()
+                    await asyncio.gather(*(self.tasks[task_id].actor_model.async_onload()))
+                    tp.end()
+
+
                 tp = TracePoint(f"task-{task_id}: update weight", "1")
                 tp.begin()
                 await asyncio.gather(*(self.tasks[task_id].actor_model.async_update_weights()))
@@ -74,6 +81,13 @@ class Scheduler:
                 tp.begin()
                 await self.tasks[task_id].rollout_generator.async_generate(rollout_id)
                 tp.end()
+
+
+                if args.offload:
+                    tp = TracePoint(f"task-{task_id}: actor model offload", "1")
+                    tp.begin()
+                    await asyncio.gather(*(self.tasks[task_id].actor_model.async_offload()))
+                    tp.end()
 
                 if args.offload:
                     tp = TracePoint(f"task-{task_id}: rollout model offload", "1")

@@ -14,7 +14,7 @@ import wandb
 GLOO_GROUPS = {}
 
 
-def _init_gloo_group(task_id=None):
+def _init_gloo_group(task_id):
     """Initialize Gloo group for distributed communication."""
     global GLOO_GROUPS
     if task_id not in GLOO_GROUPS:
@@ -22,7 +22,7 @@ def _init_gloo_group(task_id=None):
     return GLOO_GROUPS[task_id]
 
 
-def get_gloo_group(task_id=None):
+def get_gloo_group(task_id):
     """Get the Gloo group for distributed communication."""
     global GLOO_GROUPS
     if task_id not in GLOO_GROUPS:
@@ -76,7 +76,7 @@ def init(args):
     set_args(args)
     # Pytorch distributed.
     _initialize_distributed(args)
-    _init_gloo_group(getattr(args, 'task_id', None))
+    _init_gloo_group(getattr(args, 'task_id'))
 
     # https://github.com/NVIDIA/Megatron-LM/issues/1563
     assert np.__version__.startswith("1."), "Megatron does not support numpy 2.x"

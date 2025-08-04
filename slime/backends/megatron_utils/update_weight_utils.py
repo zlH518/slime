@@ -176,7 +176,7 @@ def get_param_infos(args, model) -> list[ParamInfo]:
     dist.all_gather_object(
         obj=param_infos,
         object_list=all_param_info_list,
-        group=get_gloo_group(),
+        group=get_gloo_group(args.task_id),
     )
     for i, param_info in enumerate(param_infos):
         for infos in all_param_info_list:
