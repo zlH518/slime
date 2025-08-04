@@ -107,7 +107,50 @@ def init(args):
         custom_init = load_function(args.custom_megatron_init_path)
         custom_init(args)
 
+    if args.use_wandb and (
+            mpu.get_data_parallel_rank(with_context_parallel=True) == 0
+            and mpu.get_tensor_model_parallel_rank() == 0
+            and mpu.get_pipeline_model_parallel_rank() == mpu.get_pipeline_model_parallel_world_size() - 1
+        ):
+            if args.wandb_key is not None:
+                wandb.login(key=args.wandb_key, host=args.wandb_host)
+            # add random 6 length string with characters
+            if args.wandb_random_suffix:
+                group = args.wandb_group + "_" + wandb.util.generate_id()
+                run_name = f"{group}-RANK_{args.rank}"
+            else:
+                group = args.wandb_group
+                run_name = args.wandb_group
+            if os.environ.get("WANDB_MODE") is 'online':
+                wandb.init(
+                    entity=args.wandb_team,
+                    project=args.wandb_project,
+                    group=group,
+                    name=run_name,
+                    config=args.__dict__,
+                    settings=wandb.Settings(mode="online", x_primary=True),
+                )
+            else:
+                wandb.init(
+                    entity=args.wandb_team,
+                    project=args.wandb_project,
+                    group=group,
+                    name=run_name,
+                    config=args.__dict__,
+                    settings=wandb.Settings(mode="offline", x_primary=True),
+                )
 
+            wandb.define_metric("train/step")
+            wandb.define_metric("train/*", step_metric="train/step")
+            wandb.define_metric("rollout/step")
+            wandb.define_metric("rollout/*", step_metric="rollout/step")
+            wandb.define_metric("multi_turn/*", step_metric="rollout/step")
+            wandb.define_metric("passrate/*", step_metric="rollout/step")
+            wandb.define_metric("eval/step")
+            wandb.define_metric("eval/*", step_metric="eval/step")
+            wandb.define_metric("perf/step")
+            wandb.define_metric("perf/*", step_metric="rollout/step")
+            return wandb.run.id
 
 # TODO shall we use a simpler method to determine which rank to init wandb?
 def is_megatron_main_rank():

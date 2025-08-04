@@ -82,3 +82,11 @@ timeline上面看起来没有问题
 修改成4b了
 task-0 end to end time: 878.8690769672394
 task-1 end to end time: 967.3052179813385
+
+
+10.测试一下8中改为单任务不offload
+task-0 end to end time: 659.0470621585846
+
+
+11.测试一下7B下的两个任务的带offload
+通信组初始化出问题了，需要细节看看

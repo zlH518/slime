@@ -29,13 +29,6 @@ class RolloutRayActor(RayActor):
         self.status = ActorStatus.PENDING
         os.environ["GLOBAL_RANK"] = str(global_rank)
         vinit()
-        wandb.init(
-            project=args.wandb_project+str(args.task_id),
-            group=f"{args.wandb_group}-{args.task_id}",
-            name=f"{args.task_id}-RolloutRayActor-{self.rank}",
-            config={"rank": self.rank},
-        )
-        init_wandb_common()
 
     def init(self, dist_init_addr, port, nccl_port):
         tp = TracePoint(f"task-{self.args.task_id}: rollout actor init", "1")
