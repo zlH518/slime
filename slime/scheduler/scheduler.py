@@ -20,7 +20,6 @@ class Scheduler:
 
         self.train_lock= asyncio.Lock()
         self.rollout_lock = asyncio.Lock()
-        # self.update_weight_lock = asyncio.Lock()
 
 
         self.pgs = args.pgs
@@ -60,40 +59,35 @@ class Scheduler:
         for rollout_id in range(args.start_rollout_id, args.num_rollout):
             async with self.rollout_lock:
                 if args.offload:
-                    tp = TracePoint(f"task-{task_id}: rollout model onload", "1")
-                    tp.begin()
-                    await asyncio.gather(*(self.tasks[task_id].rollout_generator.async_onload()))
-                    tp.end()
-            
-                if args.offload:
-                    tp = TracePoint(f"task-{task_id}: actor model onload", "1")
-                    tp.begin()
-                    await asyncio.gather(*(self.tasks[task_id].actor_model.async_onload()))
-                    tp.end()
+                    rao_p = TracePoint(f"task-{task_id}: rollout and actor model onload", "1")
+                    rao_p.begin()
+                    r_and_a_on_ref = []
+                    r_and_a_on_ref.extend(self.tasks[task_id].rollout_generator.async_onload())
+                    r_and_a_on_ref.extend(self.tasks[task_id].actor_model.async_onload())
+                    await asyncio.gather(*r_and_a_on_ref)
+                    rao_p.end()
 
 
-                tp = TracePoint(f"task-{task_id}: update weight", "1")
-                tp.begin()
+                u_p = TracePoint(f"task-{task_id}: update weight", "1")
+                u_p.begin()
                 await asyncio.gather(*(self.tasks[task_id].actor_model.async_update_weights()))
-                tp.end()
+                u_p.end()
 
-                tp = TracePoint(f"task-{task_id}: rollout", "1")
-                tp.begin()
-                await self.tasks[task_id].rollout_generator.async_generate(rollout_id)
-                tp.end()
+                g_p = TracePoint(f"task-{task_id}: generate", "1")
+                g_p.begin()
+                generate = self.tasks[task_id].rollout_generator.async_generate(rollout_id)
 
-
+                offload_ref = []
                 if args.offload:
-                    tp = TracePoint(f"task-{task_id}: actor model offload", "1")
+                    tp = TracePoint(f"task-{task_id}: actor and rollout model offload", "1")
                     tp.begin()
-                    await asyncio.gather(*(self.tasks[task_id].actor_model.async_offload()))
-                    tp.end()
+                    offload_ref.extend(self.tasks[task_id].actor_model.async_offload())
 
-                if args.offload:
-                    tp = TracePoint(f"task-{task_id}: rollout model offload", "1")
-                    tp.begin()
-                    await asyncio.gather(*(self.tasks[task_id].rollout_generator.async_offload()))
+                    await generate
+                    g_p.end()
+                    offload_ref.extend(self.tasks[task_id].rollout_generator.async_offload())
                     tp.end()
+                await asyncio.gather(*offload_ref)
 
             async with self.train_lock:
                 if args.offload:

@@ -71,6 +71,7 @@ def _create_placement_group(num_gpus):
 
 
 def create_placement_groups(args):
+    # TODO maybe can calaute for every task
     """Create placement groups for actor and rollout engines."""
 
     num_gpus = 0
@@ -99,8 +100,8 @@ def create_placement_groups(args):
 
 
 def allocate_train_group(num_nodes, num_gpus_per_node, pg, task_id):
-    # TODO: need to cacluate
-    num_gpus_per_actor = 0.4
+    # TODO: need to cacluate for every task
+    num_gpus_per_actor = 0.2
 
     return RayTrainGroup(
         num_nodes=num_nodes,

@@ -28,5 +28,6 @@ class SchedulerParams:
         self.tasks_args_template.pgs = self.pgs
         self.tasks_args_template.tasks_num = self.tasks_num
 
+        # TODO 读取task_args_dir下的list，然后分别整理成参数列表返回
         self.tasks_args = [copy.deepcopy(self.tasks_args_template) for _ in range(self.tasks_num)]
 

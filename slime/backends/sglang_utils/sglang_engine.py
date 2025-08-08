@@ -31,6 +31,7 @@ class SglangEngine:
         self.global_rank = global_rank
         os.environ["GLOBAL_RANK"] = str(global_rank)
         vinit()
+        MemTracePoint.record("before sglang engine init")
         # remove the CUDA_VISIBLE_DEVICES set by ray and use base_gpu_id
         os.environ.pop("CUDA_VISIBLE_DEVICES", None)
 
@@ -75,6 +76,7 @@ class SglangEngine:
         self.llm = HttpServerEngineAdapter(
             router_ip=args.sglang_router_ip, router_port=args.sglang_router_port, **kwargs
         )
+        MemTracePoint.record("after sglang engine init")
 
     def init_process_group(self, master_address, master_port, rank_offset, world_size, group_name, backend):
         return self.llm.init_weights_update_group(
