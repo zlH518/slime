@@ -59,11 +59,10 @@ class MegatronTrainRayActor(TrainRayActor):
         m_op = TracePoint(f"task-{self.args.task_id}: init model and optimizer", "1")
         m_op.begin()
         MemTracePoint.record("before init model and optimizer")
-        torch.cuda.memory._record_memory_history()
+        # torch.cuda.memory._record_memory_history()
         (self.model, self.optimizer, self.opt_param_scheduler, loaded_rollout_id) = initialize_model_and_optimizer(
             args
         )
-        torch.cuda.memory._dump_snapshot("/volume/pt-train/users/mingjie/hzl_code/code/slime/scripts/0804/3/shapshot/init_model.pickle")
         MemTracePoint.record("after init model and optimizer")
         m_op.end()
 
@@ -79,14 +78,20 @@ class MegatronTrainRayActor(TrainRayActor):
         locp = TracePoint(f"task-{self.args.task_id}: load other model", "1")
         locp.begin()
         if with_ref:
+            rp = TracePoint(f"task-{self.args.task_id}: load ref model", "1")
+            rp.begin()
             MemTracePoint.record("before load ref model")
             self.load_other_checkpoint("ref", args.ref_load)
             MemTracePoint.record("after load ref model")
+            rp.end()
 
         if self.args.keep_old_actor:
+            koap = TracePoint(f"task-{self.args.task_id}: load old actor model", "1")
+            koap.begin()
             MemTracePoint.record("before load old actor model")
             self.load_other_checkpoint("old_actor", args.load)
             MemTracePoint.record("after load old actor model")
+            koap.end()
 
         locp.end()
 

@@ -28,8 +28,8 @@ class RayTrainGroup:
         num_nodes,
         num_gpus_per_node,
         pg: tuple[PlacementGroup, list[int]],
-        num_gpus_per_actor=1,
-        task_id:int = None,
+        num_gpus_per_actor: float,
+        task_id:int,
         resources: Dict[str, float] = None,
         num_resources_per_node: int = None,
     ) -> None:

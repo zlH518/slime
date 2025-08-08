@@ -33,7 +33,7 @@ class Buffer:
         self.args = args
 
         vinit()
-        tp = TracePoint(f"task-{self.args.task_id}", "1")
+        tp = TracePoint(f"task-{self.args.task_id}: init data buffer", "1")
         tp.begin()
 
         # a list of sample group.

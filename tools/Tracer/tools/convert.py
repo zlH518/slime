@@ -17,13 +17,13 @@ parser.add_argument(
     "--input-file",
     help="Input log file path (e.g., rank_0.log)",
     type=str,
-    default = "/volume/pt-train/users/mingjie/hzl_code/code/slime/scripts/0804/10/log"
+    default = "/volume/pt-train/users/mingjie/hzl_code/code/slime/scripts/0808/4/log"
 )
 parser.add_argument(
     "--output-file",
     help="Output JSON file path (e.g., trace.json)",
     type=str,
-    default = "/volume/pt-train/users/mingjie/hzl_code/code/slime/scripts/0804/10/json/0804-2task"
+    default = "/volume/pt-train/users/mingjie/hzl_code/code/slime/scripts/0808/4/json/0808-2task"
 )
 parser.add_argument(
     "--min-time",
@@ -106,7 +106,7 @@ def parse_trace_line(line: str, type: str):
                 return None
             process_id = "rank" + str(int(parts[1]))
             name = str(parts[2])
-            used_memory = float(int(parts[3]) / 1024 / 1024)
+            used_memory = float(int(parts[3]) / 1024**3)
             return MemoryEvent(timestamp, process_id, name, used_memory)
 
         return None
