@@ -17,7 +17,7 @@ async def main(args):
 
 
     scheduler_args = SchedulerParams(
-        tasks_num=2,
+        tasks_num=1,
         tasks_args_dir="xxx",
         tasks_args_template=args,
         train_semaphore=1,

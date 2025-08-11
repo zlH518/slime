@@ -28,8 +28,6 @@ async def remote_rm(args, sample: Sample):
 
 
 async def async_rm(args, sample: Sample, **kwargs):
-    # breakpoint()
-    # return random.randint(0, 1)
     if args.custom_rm_path is not None:
         rm_function = load_function(args.custom_rm_path)
         return await rm_function(args, sample, **kwargs)

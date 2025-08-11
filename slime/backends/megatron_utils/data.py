@@ -379,18 +379,18 @@ async def log_eval_data(rollout_id, args, data_buffer):
             wandb.log(log_dict)
 
 
-def log_perf_data(rollout_id, args):
+def log_perf_data(rollout_id, args, task_id):
     timer_instance = Timer()
     if (
         mpu.get_tensor_model_parallel_rank() == 0
         and mpu.is_pipeline_last_stage()
         and mpu.get_data_parallel_rank(with_context_parallel=True) == 0
     ):
-        log_dict = {f"perf/{key}_time": val for key, val in timer_instance.log_dict().items()}
+        log_dict = {f"perf/{key}_time": val for key, val in timer_instance.log_dict(task_id).items()}
 
         if "perf/actor_train_time" in log_dict:
             world_size = dist.get_world_size()
-            total_fwd_flops = calculate_fwd_flops(seqlens=timer_instance.seq_lens, args=args) / world_size / 1e12
+            total_fwd_flops = calculate_fwd_flops(seqlens=timer_instance.get(task_id, "seq_lens"), args=args) / world_size / 1e12
 
             if "perf/log_probs_time" in log_dict:
                 log_dict["perf/log_probs_tflops"] = total_fwd_flops / log_dict["perf/log_probs_time"]
@@ -415,4 +415,4 @@ def log_perf_data(rollout_id, args):
                 else rollout_id * args.rollout_batch_size * args.n_samples_per_prompt // args.global_batch_size
             )
             wandb.log(log_dict)
-    timer_instance.reset()
+    timer_instance.reset(task_id, name=None, save_key={""})

@@ -12,6 +12,7 @@ import wandb
 from slime.utils.data import Dataset
 from slime.utils.misc import load_function
 from slime.utils.types import Sample
+from slime.utils.timer import Timer, timer
 from slime.utils.wandb_utils import init_wandb_common
 
 from tracer import vinit, TracePoint, MemTracePoint

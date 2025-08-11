@@ -135,8 +135,11 @@ async def generate_and_rm(args, sample: Sample, sampling_params: dict, evaluatio
     # for the rm that need the whole group, we will not do the rm here
     if args.group_rm:
         return sample
-
+    
+    # breakpoint()
     sample.reward = await async_rm(args, sample)
+
+    # print(sample)
 
     return sample
 

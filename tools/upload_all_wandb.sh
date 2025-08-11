@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 离线 wandb 日志目录（请根据实际情况修改）
-WANDB_DIR="/volume/pt-train/users/mingjie/hzl_code/code/slime/scripts/0804/13/wandb/wandb"
+WANDB_DIR="/volume/pt-train/users/mingjie/hzl_code/code/slime/scripts/0808/8/wandb/wandb"
 
 # 写死的排除文件/文件夹列表
 EXCLUDE_FILES=("latest-run" "debug-internal.log" "debug.log")
