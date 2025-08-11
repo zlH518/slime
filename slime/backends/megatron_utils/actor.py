@@ -53,7 +53,7 @@ class MegatronTrainRayActor(TrainRayActor):
             dist.barrier(group=get_gloo_group(self.args.task_id))
 
         if self.args.debug_rollout_only:
-            Timer().start("train_wait")
+            Timer().start(self._task_id, "train_wait")
             return 0
 
         m_op = TracePoint(f"task-{self.args.task_id}: init model and optimizer", "1")
@@ -134,7 +134,7 @@ class MegatronTrainRayActor(TrainRayActor):
 
             self.rollout_data_postprocess = load_function(self.args.rollout_data_postprocess_path)
 
-        Timer().start("train_wait")
+        Timer().start(self._task_id, "train_wait")
         tp.end()
         return start_rollout_id
 
@@ -154,7 +154,7 @@ class MegatronTrainRayActor(TrainRayActor):
             torch.cuda.synchronize()
 
     def sleep(self, tags):
-        with timer("sleep"):
+        with timer(self._task_id, "sleep"):
             tp = TracePoint(f"task-{self.args.task_id}: actor model real sleep", "1")
             tp.begin()
             MemTracePoint.record("before offload actor model")
@@ -179,7 +179,7 @@ class MegatronTrainRayActor(TrainRayActor):
             tp.end()
 
     def wake_up(self, tags):
-        with timer("wake up"):
+        with timer(self._task_id, "wake_up"):
             tp = TracePoint(f"task-{self.args.task_id}: actor model real wake up", "1")
             tp.begin()
             MemTracePoint.record("before onload actor model")
@@ -220,6 +220,7 @@ class MegatronTrainRayActor(TrainRayActor):
             mpu.get_data_parallel_rank(with_context_parallel=False),
             mpu.get_data_parallel_world_size(with_context_parallel=False),
             rollout_data=rollout_data,
+            task_id=self._task_id
         )
 
     def compute_log_prob(
@@ -236,7 +237,7 @@ class MegatronTrainRayActor(TrainRayActor):
 
         self.update_gpu_params_dict(self.weights[model_tag])
 
-        with timer(f"{store_prefix}log_probs"):
+        with timer(self._task_id, f"{store_prefix}-log_probs"):
             forward_only(
                 self.args,
                 self.model,
@@ -251,7 +252,7 @@ class MegatronTrainRayActor(TrainRayActor):
             assert self.status == ActorStatus.ONLOAD
         # if self._task_id == 1:
         #     breakpoint()
-        Timer().end("train_wait")
+        Timer().end(self._task_id, "train_wait")
         prepare_train = TracePoint(f"task-{self.args.task_id}: megatron train actor prepare train", "1")
         prepare_train.begin()
 
@@ -266,13 +267,12 @@ class MegatronTrainRayActor(TrainRayActor):
                 data_fetch_trace.end()
 
             log_rollout_data(rollout_id, self.args, rollout_data)
-            log_perf_data(rollout_id, self.args)
-            train_trace.end()
-            Timer().start("train_wait")
+            log_perf_data(rollout_id, self.args, self._task_id)
+            Timer().start(self._task_id, "train_wait")
             return
 
-        with timer("train"):
-            with timer("data_preprocess"):
+        with timer(self._task_id, "train"):
+            with timer(self._task_id, "data_preprocess"):
                 # For async train, we need to separate the data fetching and training.
                 if with_data_fetching:
                     data_fetch_trace = TracePoint(f"task-{self.args.task_id}: megatron train actor data fetch", "1")
@@ -341,7 +341,7 @@ class MegatronTrainRayActor(TrainRayActor):
 
             prepare_train.end()
             # Train
-            with timer("actor_train"):
+            with timer(self._task_id, "actor_train"):
                 tp = TracePoint(f"task-{self.args.task_id}: megatron train actor real train", "1")
                 tp.begin()
                 train(
@@ -355,8 +355,8 @@ class MegatronTrainRayActor(TrainRayActor):
                 )
                 tp.end()
 
-        log_perf_data(rollout_id, self.args)
-        Timer().start("train_wait")
+        log_perf_data(rollout_id, self.args, self._task_id)
+        Timer().start(self._task_id, "train_wait")
 
     async def eval(self, rollout_id):
         if self.args.debug_train_only:
@@ -404,7 +404,7 @@ class MegatronTrainRayActor(TrainRayActor):
         tp.begin()
         MemTracePoint.record("before update weights")
 
-        with timer("update_weight"):
+        with timer(self._task_id, "update_weight"):
             if self.args.debug_train_only or self.args.debug_rollout_only:
                 return
 

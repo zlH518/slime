@@ -68,7 +68,7 @@ def get_minimum_num_micro_batch_size(total_lengths, max_tokens_per_gpu, cp_size)
     return len(batches)
 
 
-async def process_rollout_data(rollout_id, args, data_buffer, dp_rank, dp_size, rollout_data):
+async def process_rollout_data(rollout_id, args, data_buffer, dp_rank, dp_size, rollout_data, task_id):
     rank = dist.get_rank()
 
     if rank == 0:
@@ -105,7 +105,7 @@ async def process_rollout_data(rollout_id, args, data_buffer, dp_rank, dp_size, 
     data["total_lengths"] = total_lengths
 
     # save the seqlen of the whole rollout batch
-    Timer().seq_lens = total_lengths
+    Timer().set(task_id, "seq_lens", total_lengths)
 
     if args.balance_data:
         # Group-aware partitioning to keep each group together

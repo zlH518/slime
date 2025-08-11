@@ -219,8 +219,9 @@ class UpdateWeightFromTensor:
         self.vocab_size = vocab_size
         self.quantization_config = quantization_config
         self.param_info_buckets = get_param_info_buckets(self.args, self.model)
+        vinit()
 
-    def connect_rollout_engines(self, rollout_engines, rollout_engine_lock):
+    async def connect_rollout_engines(self, rollout_engines, rollout_engine_lock):
         self.rollout_engines = rollout_engines
 
         # Here we assume the gpu id of rollout engines and train actors are the same.
@@ -237,15 +238,15 @@ class UpdateWeightFromTensor:
                 self._ipc_gather_group = new_group
                 self._ipc_engine = engine
 
-    def update_weights(self):
+    async def update_weights(self):
         rank = dist.get_rank()
         if rank == 0:
-            ray.get([engine.reset_prefix_cache.remote() for engine in self.rollout_engines])
+            await asyncio.gather(*[engine.reset_prefix_cache.remote() for engine in self.rollout_engines])
         dist.barrier(group=get_gloo_group(self.args.task_id))
         for param_infos in tqdm(self.param_info_buckets, disable=rank != 0, desc="Update weights"):
-            self._update_bucket_weights_from_tensor(param_infos)
+            await self._update_bucket_weights_from_tensor(param_infos)
 
-    def _update_bucket_weights_from_tensor(self, param_infos):
+    async def _update_bucket_weights_from_tensor(self, param_infos):
         pp_size = mpu.get_pipeline_model_parallel_world_size()
         ep_size = mpu.get_expert_model_parallel_world_size()
         rank = dist.get_rank()
@@ -304,9 +305,9 @@ class UpdateWeightFromTensor:
             converted_named_tensors.extend(
                 convert_to_hf(self.args, self.model_name, info.name, param, self.quantization_config)
             )
-        self._update_converted_params_from_tensor(converted_named_tensors)
+        await self._update_converted_params_from_tensor(converted_named_tensors)
 
-    def _update_converted_params_from_tensor(self, converted_named_tensors):
+    async def _update_converted_params_from_tensor(self, converted_named_tensors):
         ipc_handle = MultiprocessingSerializer.serialize(converted_named_tensors, output_str=True)
         ipc_handles = (
             [None] * dist.get_world_size(self._ipc_gather_group) if self._ipc_gather_src == dist.get_rank() else None
@@ -322,7 +323,7 @@ class UpdateWeightFromTensor:
             ref = self._ipc_engine.update_weights_from_tensor.remote(
                 ipc_handles=ipc_handles,
             )
-            ray.get(ref)
+            await ref
 
 
 class UpdateWeightFromDistributed:
