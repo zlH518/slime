@@ -230,6 +230,7 @@ async def generate_rollout_async(args, rollout_id: int, data_buffer) -> list[lis
         while state.remaining_batch_size < target_data_size:
             # get samples from the buffer and submit the generation requests.
             samples = data_buffer.get_samples(args.over_sampling_batch_size)
+            # breakpoint()
             state.submit_generate_tasks(samples)
 
         # wait for the generation to finish

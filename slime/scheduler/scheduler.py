@@ -2,6 +2,7 @@
 下面是分三个阶段做的并行任务，提高并行度
 """
 
+import os
 import ray
 import time
 import wandb
@@ -10,6 +11,7 @@ import asyncio
 from .task import Task
 from tracer import vinit, TracePoint
 from slime.utils.timer import Timer, timer
+from contextlib import redirect_stdout
 
 class Scheduler:
     """
@@ -57,14 +59,20 @@ class Scheduler:
             await asyncio.gather(*[self.train(task_id) for task_id in range(self.tasks_num)])
 
         print("All concurrent training tasks finished.")
-        print("6"*200)
-        for task_id in range(self.tasks_num):
-            print("*"*200)
-            print(f"task-{task_id}")
-            for k,v in Timer().log_dict(task_id).items():
-                print(k, v)
-            print("*"*200)
-        print("6"*200)
+        perf_path = os.getenv("PERF_DIR", "")
+        assert perf_path is not ""
+        log_path = os.path.join(perf_path, "perf.log")
+        with open(log_path, "a") as f:
+            with redirect_stdout(f):
+                print("All concurrent training tasks finished.")
+                print("6" * 200)
+                for task_id in range(self.tasks_num):
+                    print("*" * 200)
+                    print(f"task-{task_id}")
+                    for k, v in Timer().log_dict(task_id).items():
+                        print(k, v)
+                    print("*" * 200)
+                print("6" * 200)
 
 
     async def train(self, task_id):

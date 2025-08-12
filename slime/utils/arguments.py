@@ -787,6 +787,7 @@ def get_slime_extra_args_provider(add_custom_arguments=None):
         parser = add_custom_megatron_plugins_arguments(parser)
         # For megatron
         parser.add_argument("--padded-vocab-size", type=int, default=None)
+        parser.add_argument("--tasks-num", type=int, default=None)
 
         return parser
 
