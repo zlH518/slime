@@ -203,7 +203,6 @@ class MegatronTrainRayActor(TrainRayActor):
 
             if self.args.compute_advantages_and_returns:
                 if "ref" in self.weights:
-                    self.update_gpu_params_dict(self.weights["ref"])
                     rollout_data.update(
                         self.compute_log_prob(
                             "ref",
