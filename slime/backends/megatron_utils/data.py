@@ -96,7 +96,7 @@ def get_data_iterator(args, model, rollout_data):
 
     if not args.use_dynamic_batch_size:
         log_probs_num_microbatches = num_local_samples // args.ref_micro_batch_size
-        train_num_microbatches = [num_local_gbs // args.micro_batch_size for _ in range(num_steps_per_rollout)]
+        train_num_microbatches = [num_local_gbs // args.micro_batch_size for _ in range(num_steps_per_rollout)] # 16/8 = 2 ---> [[8], [8]]
 
         log_probs_data_iterator = []
         train_data_iterator = []

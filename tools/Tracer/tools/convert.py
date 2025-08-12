@@ -17,13 +17,13 @@ parser.add_argument(
     "--input-file",
     help="Input log file path (e.g., rank_0.log)",
     type=str,
-    default = "/volume/pt-train/users/mingjie/hzl_code/code/slime/scripts/0808/10/log"
+    default = "/volume/pt-train/users/mingjie/hzl_code/code/slime/scripts/0811/1/log"
 )
 parser.add_argument(
     "--output-file",
     help="Output JSON file path (e.g., trace.json)",
     type=str,
-    default = "/volume/pt-train/users/mingjie/hzl_code/code/slime/scripts/0808/10/json/0808-1task"
+    default = "/volume/pt-train/users/mingjie/hzl_code/code/slime/scripts/0811/1/json/0811-1task"
 )
 parser.add_argument(
     "--min-time",

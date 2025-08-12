@@ -257,6 +257,7 @@ class MegatronTrainRayActor(TrainRayActor):
         prepare_train.begin()
 
         rollout_data = {}
+        # breakpoint()        
 
         if self.args.debug_rollout_only:
             # For debug rollout, we just log the data and return.
