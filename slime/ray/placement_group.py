@@ -91,8 +91,8 @@ def create_placement_groups(args):
     rollout_pg_reordered_bundle_indices = actor_pg_reordered_bundle_indices[rollout_offset:]
 
     return {
-        "actor": (pg, actor_pg_reordered_bundle_indices),
-        "rollout": (pg, rollout_pg_reordered_bundle_indices),
+        "actor": (pg, 0, actor_pg_reordered_bundle_indices),
+        "rollout": (pg, rollout_offset, rollout_pg_reordered_bundle_indices),
     }
 
 
