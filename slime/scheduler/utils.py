@@ -16,10 +16,6 @@ class SchedulerParams:
     tasks_args_template: Any = None
 
     pgs: dict = None
-    train_semaphore: int = 1
-    rollout_semaphore:int  = 1
-    update_weight_semaphore:int = 1
-    save_semaphore: int = 1
 
     # TODO:should read multi tasks args from different yaml file
     def __post_init__(self):
