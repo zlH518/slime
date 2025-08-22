@@ -29,6 +29,7 @@ from .update_weight_utils import (
     named_parameters,
     UpdateWeightFromTensor,
     UpdateWeightFromDistributed,
+    UpdateWeightFromDisk,
 )
 
 
@@ -65,7 +66,11 @@ class MegatronTrainRayActor(TrainRayActor):
         if self.args.keep_old_actor:
             self.load_other_checkpoint("old_actor", args.load)
 
-        update_weight_cls = UpdateWeightFromTensor if self.args.colocate else UpdateWeightFromDistributed
+        if self.args.heterogeneous_cluster:
+            update_weight_cls = UpdateWeightFromDisk
+        else:
+            update_weight_cls = UpdateWeightFromTensor if self.args.colocate else UpdateWeightFromDistributed
+            
         self.weight_updator = update_weight_cls(
             self.args,
             self.model,
