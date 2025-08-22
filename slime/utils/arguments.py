@@ -71,6 +71,15 @@ def get_slime_extra_args_provider(add_custom_arguments=None):
                     "This will always be true when --colocate is set."
                 ),
             )
+            parser.add_argument(
+                "--heterogeneous_cluster",
+                action="store_true",
+                default=False,
+                help=(
+                    "Whether to use heterogeneous cluster. "
+                    "Turning this on will also need to set --colocate to false. "
+                ),
+            )
 
             return parser
 
