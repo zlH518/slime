@@ -29,6 +29,7 @@ from .update_weight_utils import (
     named_parameters,
     UpdateWeightFromTensor,
     UpdateWeightFromDistributed,
+    UpdateWeightFromDisk,
 )
 
 
@@ -69,7 +70,11 @@ class MegatronTrainRayActor(TrainRayActor):
             self.weights["rollout_actor"] = {}
             self.update_cpu_params_dict(self.weights["rollout_actor"])
 
-        update_weight_cls = UpdateWeightFromTensor if self.args.colocate else UpdateWeightFromDistributed
+        if self.args.heterogeneous_cluster:
+            update_weight_cls = UpdateWeightFromDisk
+        else:
+            update_weight_cls = UpdateWeightFromTensor if self.args.colocate else UpdateWeightFromDistributed
+            
         self.weight_updator = update_weight_cls(
             self.args,
             self.model,
