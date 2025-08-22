@@ -1,3 +1,5 @@
+import os
+import json
 import re
 import socket
 import time
@@ -15,6 +17,7 @@ from .initialize import get_gloo_group
 from .megatron_to_hf import convert_to_hf  # noqa: F401
 from slime.utils.distributed_utils import init_process_group
 from sglang.srt.patch_torch import monkey_patch_torch_reductions
+from safetensors.torch import save_file
 
 try:
     from sglang.srt.model_executor.model_runner import FlattenedTensorBucket
@@ -608,3 +611,203 @@ class UpdateWeightFromDistributed:
         converted_named_tensors.clear()
         ray.get(self.rollout_engine_lock.release.remote())
         pbar.update(1)
+
+
+class UpdateWeightFromDisk:
+    def __init__(self, args, model, weights, *, model_name, quantization_config, vocab_size, hf_config=None):
+        self.args = args
+        self.model = model
+        self.weights = weights
+        self.model_name = model_name
+        self.vocab_size = vocab_size
+        self.quantization_config = quantization_config
+        self.hf_config = hf_config
+        self.rollout_engines = None
+        self.rollout_engine_lock = None
+
+        self.disk_path = os.path.join(self.args.save, "disk_weights")
+        print(f"HF model will be saved to: {self.disk_path}")
+        if dist.get_rank() == 0:
+            os.makedirs(self.disk_path, exist_ok=True)
+
+    def connect_rollout_engines(self, rollout_engines, rollout_engine_lock):
+        self.rollout_engines = rollout_engines
+        self.rollout_engine_lock = rollout_engine_lock
+        
+        if not self.rollout_engines:
+            print("Warning: No rollout engines connected.")
+        else:
+            print(f"Successfully connected to {len(self.rollout_engines)} rollout engines")
+
+    @torch.no_grad()
+    def update_weights(self):
+        if dist.get_rank() == 0 and self.rollout_engines:
+            ray.get([engine.pause_generation.remote() for engine in self.rollout_engines])
+            ray.get([engine.flush_cache.remote() for engine in self.rollout_engines])
+        dist.barrier(group=get_gloo_group())
+
+        tp = TracePoint("convert_and_aggregate_weights", "update_weight_utils.py")
+        tp.begin()
+        final_hf_weights = {}
+        if dist.get_rank() == 0:
+            print("Rank 0: Start converting and aggregating weights.")
+            total_params = len(list(named_parameters(self.args, self.model)))
+            pbar = tqdm(desc="Convert and aggregate weights", total=total_params)
+        else:
+            pbar = None
+
+        for name, param in named_parameters(self.args, self.model):
+            full_param = all_gather_param(name, param)
+            
+            if dist.get_rank() == 0:
+                padded_param = remove_padding(name, full_param, self.vocab_size)
+                
+                hf_tensors = convert_to_hf(self.args, self.model_name, name, padded_param, self.quantization_config)
+                
+                for hf_name, hf_tensor in hf_tensors:
+                    final_hf_weights[hf_name] = hf_tensor.cpu()
+                
+                if pbar: pbar.update(1)
+        
+        if pbar: pbar.close()
+ 
+        dist.barrier(group=get_gloo_group())
+        tp.end()
+        if dist.get_rank() == 0:
+            tp = TracePoint("save_as_hf_model", "update_weight_utils.py")
+            tp.begin()
+            self._save_as_hf_model(final_hf_weights)
+            tp.end()
+        dist.barrier(group=get_gloo_group())
+
+        tp = TracePoint("update_weights_from_disk", "update_weight_utils.py")
+        tp.begin()
+        if dist.get_rank() == 0 and self.rollout_engines:
+            print(f"Rank 0: Notify engines to load weights from directory: {self.disk_path}")
+            try:
+                refs = [engine.update_weights_from_disk.remote(self.disk_path) for engine in self.rollout_engines]
+                ray.get(refs)
+                print("Rank 0: Rollout engines confirmed update.")
+            except Exception as e:
+                print(f"Failed to notify rollout engines: {e}")
+                raise
+        tp.end()
+        if dist.get_rank() == 0 and self.rollout_engines:
+            ray.get([engine.continue_generation.remote() for engine in self.rollout_engines])
+        dist.barrier(group=get_gloo_group())
+        print(f"Rank {dist.get_rank()}: Weight update cycle completed.")
+
+    def _save_as_hf_model(self, state_dict):
+        if dist.get_rank() != 0:
+            return
+
+        print(f"Rank 0: Start saving model to {self.disk_path} in Hugging Face format.")
+        
+        if not state_dict:
+            print("Error: The final weight dictionary is empty, cannot save.")
+            raise RuntimeError("No weights converted for saving.")
+
+        try:
+            if self.hf_config is not None:
+                print(f"Rank 0: Using provided config object to save config.")
+                self.hf_config.save_pretrained(self.disk_path)
+                print(f"Rank 0: Saved config.json to {self.disk_path}")
+            else:
+                print(f"Rank 0: Create basic config file.")
+                self._create_basic_config()
+                print(f"Rank 0: Saved config.json to {self.disk_path}")
+
+            self._save_weights_with_chunking(state_dict)
+            
+            print("Rank 0: Successfully saved model in Hugging Face format.")
+
+        except Exception as e:
+            print(f"Rank 0: Error during model saving: {e}")
+            raise
+
+    def _create_basic_config(self):
+        config_dict = {
+            "architectures": ["Qwen3ForCausalLM"],
+            "model_type": "qwen3",
+            "torch_dtype": "bfloat16",
+            "transformers_version": "4.37.0",
+            "use_cache": True,
+            "vocab_size": self.vocab_size,
+            "hidden_size": self._infer_hidden_size(),
+            "intermediate_size": self._infer_intermediate_size(),
+            "num_hidden_layers": self._infer_num_layers(),
+            "num_attention_heads": self._infer_num_heads(),
+            "max_position_embeddings": 32768,
+            "rope_theta": 1000000.0,
+            "use_sliding_window": True,
+            "sliding_window": 4096,
+            "attention_dropout": 0.0,
+            "hidden_dropout": 0.0,
+            "partial_rotary_factor": 1.0,
+            "rope_scaling": None,
+            "attention_bias": False,
+            "tie_word_embeddings": False,
+        }
+        
+        config_path = os.path.join(self.disk_path, "config.json")
+        with open(config_path, 'w') as f:
+            json.dump(config_dict, f, indent=2)
+
+    def _infer_hidden_size(self):
+        for name, param in self.weights["actor"].items():
+            if "embedding" in name and "weight" in name:
+                return param.shape[1]
+        return 3072
+
+    def _infer_intermediate_size(self):
+        for name, param in self.weights["actor"].items():
+            if "mlp.w1.weight" in name or "mlp.w2.weight" in name:
+                return param.shape[0]
+        return 8192
+
+    def _infer_num_layers(self):
+        layer_count = 0
+        for name in self.weights["actor"].keys():
+            if "layers." in name and "mlp.w1.weight" in name:
+                layer_count += 1
+        return layer_count if layer_count > 0 else 32
+
+    def _infer_num_heads(self):
+        for name, param in self.weights["actor"].items():
+            if "attention.wq.weight" in name:
+                return param.shape[0] // 128
+        return 24
+
+    def _save_weights_with_chunking(self, state_dict):
+        chunk_size = 2 * 1024**3
+        current_size = 0
+        total_size = 0
+        model_tensors = [{}]
+        
+        for name, param in state_dict.items():
+            tensor_size = param.numel() * param.element_size()
+            if tensor_size + current_size > chunk_size:
+                model_tensors.append({})
+                current_size = 0
+            model_tensors[-1][name] = param
+            current_size += tensor_size
+            total_size += tensor_size
+
+        metadata = {"metadata": {"total_size": total_size}, "weight_map": {}}
+        num_files = len(model_tensors)
+        
+        for i, tensors in enumerate(model_tensors):
+            filename = f"model-{i:05d}-of-{num_files:05d}.safetensors"
+            for key in tensors.keys():
+                metadata["weight_map"][key] = filename
+        
+        index_filepath = os.path.join(self.disk_path, "model.safetensors.index.json")
+        with open(index_filepath, 'w') as f:
+            json.dump(metadata, f, indent=2)
+        print(f"Rank 0: Saved index file to {index_filepath}")
+
+        for i, tensors in enumerate(model_tensors):
+            filename = f"model-{i:05d}-of-{num_files:05d}.safetensors"
+            filepath = os.path.join(self.disk_path, filename)
+            save_file(tensors, filepath)
+            print(f"Rank 0: Saved weight file {filename}")
