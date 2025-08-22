@@ -237,6 +237,15 @@ class SGLangEngine(RayActor):
             },
         )
 
+    def update_weights_from_disk(self, model_path: str):
+        """
+        Update model weights from disk if you try to use the model in a heterogeneous cluster.
+        """
+        return self._make_request(
+            "update_weights_from_disk",
+            {"model_path": model_path},
+        )
+
     def pause_generation(self):
         return requests.post(f"http://{self.server_args.host}:{self.server_args.port}/pause_generation", json={})
 
