@@ -47,6 +47,9 @@ class RolloutController:
 
         self.generate_rollout = load_function(self.args.rollout_function_path)
         self.eval_generate_rollout = load_function(self.args.eval_function_path)
+        self.custom_reward_post_process_func = None
+        if self.args.custom_reward_post_process_path is not None:
+            self.custom_reward_post_process_func = load_function(self.args.custom_reward_post_process_path)
         print(f"import {self.args.rollout_function_path} as generate_rollout function.")
         print(f"import {self.args.eval_function_path} as eval_generate_rollout function.")
 
@@ -92,16 +95,49 @@ class RolloutController:
         data = self.eval_generate_rollout(self.args, rollout_id, self.data_source, evaluation=True)
         log_eval_data(rollout_id, self.args, data)
 
+    def post_process_rewards(self, samples: Union[list[Sample], list[list[Sample]]]):
+        if self.custom_reward_post_process_func is not None:
+            return self.custom_reward_post_process_func(self.args, raw_rewards)
+
+        raw_rewards = [sample.get_reward_value(self.args) for sample in samples]
+        if (
+            self.args.advantage_estimator in ["grpo", "gspo", "reinforce_plus_plus_baseline"]
+            and self.args.rewards_normalization
+        ):
+            # group norm
+            rewards = torch.tensor(raw_rewards, dtype=torch.float)
+            rewards = rewards.reshape(-1, self.args.n_samples_per_prompt)
+            mean = rewards.mean(dim=-1, keepdim=True)
+            rewards = rewards - mean
+
+            if self.args.advantage_estimator in ["grpo", "gspo"] and self.args.grpo_std_normalization:
+                std = rewards.std(dim=-1, keepdim=True)
+                rewards = rewards / (std + 1e-6)
+
+            return raw_rewards, rewards.flatten().tolist()
+
+        return raw_rewards, raw_rewards
+
     def _convert_samples_to_train_data(self, samples: Union[list[Sample], list[list[Sample]]]):
         """
         Convert inference generated samples to training data.
         """
+        raw_rewards, rewards = self.post_process_rewards(samples)
+
+        # multi agent
+        if isinstance(samples[0], list):
+            samples = sum(samples, [])
+
+        assert len(raw_rewards) == len(samples)
+        assert len(rewards) == len(samples)
+
         train_data = {
             "tokens": [sample.tokens for sample in samples],
             "response_lengths": [sample.response_length for sample in samples],
             # some reward model, e.g. remote rm, may return multiple rewards,
             # we could use key to select the reward.
-            "rewards": [sample.get_reward_value(self.args) for sample in samples],
+            "rewards": rewards,
+            "raw_reward": raw_rewards,
             "truncated": [1 if sample.status == Sample.Status.TRUNCATED else 0 for sample in samples],
             "sample_indices": [sample.index for sample in samples],
         }

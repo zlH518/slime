@@ -52,7 +52,7 @@ def get_log_probs_and_entropy(
     assert logits.dtype == torch.float32, f"{logits.dtype}"
 
     logits = logits.squeeze(0)
-    logits.div_(args.rollout_temperature)
+    logits = logits.div(args.rollout_temperature)
 
     cp_size = mpu.get_context_parallel_world_size()
 

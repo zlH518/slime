@@ -755,6 +755,14 @@ def get_slime_extra_args_provider(add_custom_arguments=None):
                     "The function should have the signature `def custom_rm(args, sample) -> float`."
                 ),
             )
+            parser.add_argument(
+                "--custom-reward-post-process-path",
+                type=str,
+                default=None,
+                help=(
+                    "Path to the custom function that will post process reward, by default it will be the normalization for grpo. "
+                ),
+            )
             return parser
 
         def add_rollout_buffer_arguments(parser):

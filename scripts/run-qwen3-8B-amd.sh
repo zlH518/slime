@@ -60,15 +60,15 @@ export PYTHONBUFFERED=16
 # Current Model convert script on AMD GPU has some issue, please download the converted model from here: https://huggingface.co/zyzshishui0627/models 
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
-source "${SCRIPT_DIR}/models/qwen3-4B.sh"
+source "${SCRIPT_DIR}/models/qwen3-8B.sh"
 
 CKPT_ARGS=(
-   --hf-checkpoint ${MODEL_DIR}/Qwen3-4B
+   --hf-checkpoint ${MODEL_DIR}/Qwen3-8B
    #--hf-checkpoint /root/Qwen3-4B-FP8
-   --ref-load ${MODEL_DIR}/Qwen3-4B_torch_dist
-   # --ref-load ${MODEL_DIR}/Qwen3-4B_torch_dist_amd_new
-   --load ${MODEL_DIR}/Qwen3-4B_slime/
-   --save ${MODEL_DIR}/Qwen3-4B_slime/
+   --ref-load ${MODEL_DIR}/Qwen3-8B_torch_dist
+   # --ref-load ${MODEL_DIR}/Qwen3-8B_torch_dist_amd_new
+   --load ${MODEL_DIR}/Qwen3-8B_slime/
+   --save ${MODEL_DIR}/Qwen3-8B_slime/
    --save-interval 20
 )
 
@@ -148,7 +148,7 @@ WANDB_ARGS=(
 # )
 SGLANG_ARGS=(
    --rollout-num-gpus-per-engine 2
-   --sglang-mem-fraction-static 0.7
+   --sglang-mem-fraction-static 0.4
 )
 ####################
 
@@ -188,7 +188,6 @@ ray job submit --address="http://127.0.0.1:8265" \
    -- python3 train.py \
    --actor-num-nodes 1 \
    --actor-num-gpus-per-node 8 \
-   --rollout-num-gpus-per-node 8 \
    --colocate \
    ${MODEL_ARGS[@]} \
    ${CKPT_ARGS[@]} \

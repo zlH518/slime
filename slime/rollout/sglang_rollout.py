@@ -148,14 +148,24 @@ async def generate_and_rm(args, sample: Sample, sampling_params: dict, evaluatio
         else:
             sample = await generate(args, sample, sampling_params)
 
-    if sample.status == Sample.Status.ABORTED:
-        return sample
-
     # for the rm that need the whole group, we will not do the rm here
     if args.group_rm:
         return sample
 
-    sample.reward = await async_rm(args, sample)
+    # multi samples
+    if isinstance(sample, list):
+        samples = sample
+        if any([sample.status == Sample.Status.ABORTED for sample in samples]):
+            return samples
+
+        rewards = await async_rm(args, samples)
+        for sample, reward in zip(samples, rewards):
+            sample.reward = reward
+    else:
+        if sample.status == Sample.Status.ABORTED:
+            return sample
+
+        sample.reward = await async_rm(args, sample)
 
     return sample
 

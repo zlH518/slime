@@ -197,6 +197,10 @@ class SGLangEngine(RayActor):
         kill_process_tree(self.process.pid)
 
     def release_memory_occupation(self):
+        requests.post(
+            f"http://{self.server_args.host}:{self.server_args.port}/abort_request",
+            json={"rid": "", "abort_all": True},
+        )
         return self._make_request("release_memory_occupation")
 
     def resume_memory_occupation(self, tags: List[str] = None):
